@@ -223,6 +223,31 @@ export function EnergyFlow({
           tone={evOn ? "consume" : "idle"}
         />
       </div>
+
+      {baselineSnapshot && baselineDate && (
+        <div
+          className="px-6 md:px-8 py-3 border-t text-xs flex flex-wrap items-center gap-x-3 gap-y-1"
+          style={{ borderColor: C.border, color: C.text, background: "rgba(0,0,0,0.12)" }}
+        >
+          <span className="uppercase tracking-[0.14em] font-semibold" style={{ color: C.muted }}>
+            Same hour, {new Date(baselineDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+          </span>
+          <span className="opacity-40">·</span>
+          <span>Solar <span className="text-white font-medium">{fmt(baselineSnapshot.pv_kw)} kW</span></span>
+          <span className="opacity-40">·</span>
+          <span>Grid {baselineSnapshot.grid_export_kw > baselineSnapshot.grid_import_kw ? "export" : "import"}{" "}
+            <span className="text-white font-medium">
+              {fmt(Math.max(baselineSnapshot.grid_import_kw, baselineSnapshot.grid_export_kw))} kW
+            </span>
+          </span>
+          {typeof baselineSnapshot.outdoor_temp_c === "number" && (
+            <>
+              <span className="opacity-40">·</span>
+              <span>{baselineSnapshot.outdoor_temp_c.toFixed(0)}°C outside</span>
+            </>
+          )}
+        </div>
+      )}
     </section>
   );
 }
