@@ -72,6 +72,7 @@ const NOTIF_LABEL: Record<NotificationPref, string> = {
 
 type Step =
   | { kind: "welcome" }
+  | { kind: "household" }
   | { kind: "appliances" }
   | { kind: "smart"; idx: number }
   | { kind: "frequency"; idx: number }
@@ -82,33 +83,41 @@ type Step =
   | { kind: "notification" }
   | { kind: "done" };
 
-const TOTAL_DOTS = 7;
+const TOTAL_DOTS = 8;
 
 function stepProgress(step: Step): number {
   switch (step.kind) {
     case "welcome":
       return 0;
-    case "appliances":
+    case "household":
       return 1;
+    case "appliances":
+      return 2;
     case "smart":
     case "frequency":
-      return 2;
-    case "overnight":
       return 3;
+    case "overnight":
+      return 4;
     case "deadline_ask":
     case "deadline_pick":
-      return 4;
-    case "priority":
       return 5;
-    case "notification":
+    case "priority":
       return 6;
-    case "done":
+    case "notification":
       return 7;
+    case "done":
+      return 8;
   }
 }
 
 export function OnboardingChat() {
   const navigate = useNavigate();
+  const search = useSearch({ from: "/welcome/" });
+  const initialHh =
+    search.hh && HOUSEHOLDS.some((h) => h.household_id === search.hh)
+      ? search.hh
+      : DEFAULT_HOUSEHOLD_ID;
+  const [selectedHouseholdId, setSelectedHouseholdId] = useState<string>(initialHh);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [step, setStep] = useState<Step>({ kind: "welcome" });
   const [typing, setTyping] = useState(false);
