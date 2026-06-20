@@ -585,6 +585,10 @@ export function OnboardingChat() {
   function skip() {
     switch (step.kind) {
       case "welcome":
+        setStep({ kind: "household" });
+        break;
+      case "household":
+        reply("Skipped");
         setStep({ kind: "appliances" });
         break;
       case "appliances":
