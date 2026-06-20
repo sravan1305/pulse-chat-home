@@ -1,8 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
 
 import { OnboardingChat } from "@/components/onboarding/OnboardingChat";
 
+const searchSchema = z.object({
+  hh: z.string().optional(),
+});
+
 export const Route = createFileRoute("/welcome/")({
+  validateSearch: searchSchema,
   head: () => ({
     meta: [
       { title: "Enpal Pulse — Quick setup" },

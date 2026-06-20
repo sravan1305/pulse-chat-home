@@ -32,8 +32,16 @@ function homeQueryOptions(input: {
 
 export const Route = createFileRoute("/")({
   validateSearch: searchSchema,
-  loaderDeps: ({ search }) => ({ hh: search.hh ?? DEFAULT_HOUSEHOLD_ID }),
-  loader: ({ context, deps }) => context.queryClient.ensureQueryData(summaryQueryOptions(deps.hh)),
+  loaderDeps: ({ search }) => ({
+    hh: search.hh ?? DEFAULT_HOUSEHOLD_ID,
+    date: search.date ?? DEMO_TODAY,
+    hour: search.hour ?? DEMO_NOW_HOUR,
+    cmp: (search.cmp ?? "1w") as CmpMode,
+  }),
+  loader: ({ context, deps }) =>
+    context.queryClient.ensureQueryData(
+      homeQueryOptions({ householdId: deps.hh, date: deps.date, hour: deps.hour, cmp: deps.cmp }),
+    ),
   head: () => ({
     meta: [
       { title: "Enpal Pulse — Your home energy at a glance" },

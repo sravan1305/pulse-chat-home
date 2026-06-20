@@ -1,4 +1,4 @@
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChatBubble,
@@ -23,6 +23,11 @@ import {
   type SmartState,
   saveOnboarding,
 } from "@/lib/onboarding";
+import householdsRaw from "@/data/raw/households.json";
+import { DEFAULT_HOUSEHOLD_ID } from "@/lib/demo-config";
+
+type HouseholdLite = { household_id: string; name: string; city: string };
+const HOUSEHOLDS = householdsRaw as HouseholdLite[];
 
 // Mock — in real app these come from the account.
 const ACCOUNT_HAS_EV_CHARGER = true;
@@ -67,6 +72,7 @@ const NOTIF_LABEL: Record<NotificationPref, string> = {
 
 type Step =
   | { kind: "welcome" }
+  | { kind: "household" }
   | { kind: "appliances" }
   | { kind: "smart"; idx: number }
   | { kind: "frequency"; idx: number }
@@ -77,33 +83,41 @@ type Step =
   | { kind: "notification" }
   | { kind: "done" };
 
-const TOTAL_DOTS = 7;
+const TOTAL_DOTS = 8;
 
 function stepProgress(step: Step): number {
   switch (step.kind) {
     case "welcome":
       return 0;
-    case "appliances":
+    case "household":
       return 1;
+    case "appliances":
+      return 2;
     case "smart":
     case "frequency":
-      return 2;
-    case "overnight":
       return 3;
+    case "overnight":
+      return 4;
     case "deadline_ask":
     case "deadline_pick":
-      return 4;
-    case "priority":
       return 5;
-    case "notification":
+    case "priority":
       return 6;
-    case "done":
+    case "notification":
       return 7;
+    case "done":
+      return 8;
   }
 }
 
 export function OnboardingChat() {
   const navigate = useNavigate();
+  const search = useSearch({ from: "/welcome/" });
+  const initialHh =
+    search.hh && HOUSEHOLDS.some((h) => h.household_id === search.hh)
+      ? search.hh
+      : DEFAULT_HOUSEHOLD_ID;
+  const [selectedHouseholdId, setSelectedHouseholdId] = useState<string>(initialHh);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [step, setStep] = useState<Step>({ kind: "welcome" });
   const [typing, setTyping] = useState(false);
@@ -228,7 +242,9 @@ export function OnboardingChat() {
       suppressInitialAskRef.current = false;
       return;
     }
-    if (step.kind === "appliances") {
+    if (step.kind === "household") {
+      ask("Which home are we setting up?");
+    } else if (step.kind === "appliances") {
       ask("Which of these do you have at home?");
     } else if (step.kind === "smart") {
       const t = appliances[step.idx];
@@ -257,6 +273,7 @@ export function OnboardingChat() {
       );
       // Persist
       const payload: OnboardingAnswers = {
+        household_id: selectedHouseholdId,
         appliances: appliances.map<ApplianceAnswer>((type) => ({
           type,
           smart: smartByAppliance[type] ?? "not_sure",
@@ -296,7 +313,31 @@ export function OnboardingChat() {
 
   function WelcomeControls() {
     return (
-      <PrimaryButton onClick={() => setStep({ kind: "appliances" })}>Let's go →</PrimaryButton>
+      <PrimaryButton onClick={() => setStep({ kind: "household" })}>Let's go →</PrimaryButton>
+    );
+  }
+
+  function HouseholdControls() {
+    const pick = (id: string) => {
+      const h = HOUSEHOLDS.find((x) => x.household_id === id);
+      if (!h) return;
+      setSelectedHouseholdId(id);
+      navigate({ to: "/welcome", search: { hh: id } });
+      reply(`${h.name} · ${h.city}`);
+      setStep({ kind: "appliances" });
+    };
+    return (
+      <div className="flex flex-wrap gap-2">
+        {HOUSEHOLDS.map((h) => (
+          <Chip
+            key={h.household_id}
+            selected={selectedHouseholdId === h.household_id}
+            onClick={() => pick(h.household_id)}
+          >
+            {h.name} · {h.city}
+          </Chip>
+        ))}
+      </div>
     );
   }
 
@@ -530,7 +571,11 @@ export function OnboardingChat() {
 
   function DoneControls() {
     return (
-      <PrimaryButton onClick={() => navigate({ to: "/welcome/dashboard" })}>
+      <PrimaryButton
+        onClick={() =>
+          navigate({ to: "/welcome/dashboard", search: { hh: selectedHouseholdId } })
+        }
+      >
         Go to my dashboard →
       </PrimaryButton>
     );
@@ -540,6 +585,10 @@ export function OnboardingChat() {
   function skip() {
     switch (step.kind) {
       case "welcome":
+        setStep({ kind: "household" });
+        break;
+      case "household":
+        reply("Skipped");
         setStep({ kind: "appliances" });
         break;
       case "appliances":
@@ -578,7 +627,7 @@ export function OnboardingChat() {
         setStep({ kind: "done" });
         break;
       case "done":
-        navigate({ to: "/welcome/dashboard" });
+        navigate({ to: "/welcome/dashboard", search: { hh: selectedHouseholdId } });
         break;
     }
   }
@@ -646,6 +695,7 @@ export function OnboardingChat() {
         {!typing && (
           <div className="pulse-enter mt-2">
             {step.kind === "welcome" && <WelcomeControls />}
+            {step.kind === "household" && <HouseholdControls />}
             {step.kind === "appliances" && <AppliancesControls />}
             {step.kind === "smart" && <SmartControls idx={step.idx} />}
             {step.kind === "frequency" && <FrequencyControls idx={step.idx} />}
