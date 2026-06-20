@@ -71,11 +71,11 @@ export function HomeHeader({
 
   const setDate = (d: Date | undefined) => {
     if (!d) return;
-    navigate({ search: (prev) => ({ ...prev, date: toISODate(d) }) });
+    navigate({ search: (prev: Record<string, unknown>) => ({ ...prev, date: toISODate(d) }) });
     setOpen(false);
   };
   const setCmp = (next: CmpMode) => {
-    navigate({ search: (prev) => ({ ...prev, cmp: next }) });
+    navigate({ search: (prev: Record<string, unknown>) => ({ ...prev, cmp: next }) });
   };
 
   const tempDelta = todayTemp - baselineTemp;
