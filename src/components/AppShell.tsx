@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ChevronDown, Home, LogOut, MessageCircle, Settings, Sparkles } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 
 import households from "@/data/raw/households.json";
 import {
@@ -11,8 +11,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useAuth } from "@/contexts/AuthContext";
 import { DEFAULT_HOUSEHOLD_ID } from "@/lib/demo-config";
-import { loadOnboarding } from "@/lib/onboarding";
 
 const NAV = [
   { to: "/", label: "Home", icon: Home },
@@ -24,17 +24,11 @@ type HouseholdLite = { household_id: string; name: string; city: string };
 
 const HOUSEHOLDS = households as HouseholdLite[];
 
-const ONBOARDING_KEY = "enpal_pulse_onboarding";
-
-/** Returns the household id derived from saved onboarding (sign-in).
- *  During SSR / first paint it returns the default so the page renders without a flash. */
+/** Returns the household id derived from the signed-in user (or default for SSR). */
 export function useActiveHouseholdId(): string {
-  const [id, setId] = useState<string>(DEFAULT_HOUSEHOLD_ID);
-  useEffect(() => {
-    const saved = loadOnboarding()?.household_id;
-    if (saved && HOUSEHOLDS.some((h) => h.household_id === saved)) setId(saved);
-  }, []);
-  return id;
+  const { user } = useAuth();
+  if (user?.id && HOUSEHOLDS.some((h) => h.household_id === user.id)) return user.id;
+  return DEFAULT_HOUSEHOLD_ID;
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -44,13 +38,10 @@ export function AppShell({ children }: { children: ReactNode }) {
     [activeId],
   );
   const navigate = useNavigate();
+  const { signOut } = useAuth();
 
-  const signOut = () => {
-    try {
-      localStorage.removeItem(ONBOARDING_KEY);
-    } catch {
-      /* noop */
-    }
+  const handleSignOut = () => {
+    signOut();
     navigate({ to: "/" });
   };
 
@@ -113,7 +104,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <DropdownMenuItem onClick={() => navigate({ to: "/settings" })}>
                   <Settings className="w-4 h-4" /> Edit setup
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive">
+                <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:text-destructive">
                   <LogOut className="w-4 h-4" /> Sign out
                 </DropdownMenuItem>
               </DropdownMenuContent>
