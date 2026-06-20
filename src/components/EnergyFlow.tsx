@@ -82,7 +82,15 @@ function Tile({
   );
 }
 
-export function EnergyFlow({ snapshot }: { snapshot: EnergyFlowSnapshot }) {
+export function EnergyFlow({
+  snapshot,
+  baselineSnapshot,
+  baselineDate,
+}: {
+  snapshot: EnergyFlowSnapshot;
+  baselineSnapshot?: EnergyFlowSnapshot & { outdoor_temp_c?: number };
+  baselineDate?: string;
+}) {
   const s = snapshot;
   const exporting = s.grid_export_kw > 0.05;
   const importing = s.grid_import_kw > 0.05;
