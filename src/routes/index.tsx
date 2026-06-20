@@ -1,6 +1,7 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
 import { ArrowRight, FileText, MessageCircle, Settings } from "lucide-react";
+import { useEffect } from "react";
 import { z } from "zod";
 
 import { AppShell, useActiveHouseholdId } from "@/components/AppShell";
@@ -9,6 +10,7 @@ import { HomeHeader, type CmpMode } from "@/components/HomeHeader";
 import { ComparisonStrip } from "@/components/ComparisonStrip";
 import { getHomeComparisonFn } from "@/lib/data-functions";
 import { DEFAULT_HOUSEHOLD_ID, DEMO_NOW_HOUR, DEMO_TODAY } from "@/lib/demo-config";
+import { loadOnboarding } from "@/lib/onboarding";
 
 const searchSchema = z.object({
   hh: z.string().optional(),
