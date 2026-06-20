@@ -345,7 +345,10 @@ export async function buildWeeklyView(householdId: string, origin: string): Prom
   };
 }
 
-export async function buildLast30Days(householdId: string, origin: string): Promise<{ days: DailySummary[] }> {
+export async function buildLast30Days(
+  householdId: string,
+  origin: string,
+): Promise<{ days: DailySummary[] }> {
   const records = await getTimeseries(householdId, origin);
   const start = addDays(DEMO_TODAY, -29);
   const days: DailySummary[] = [];
@@ -354,6 +357,242 @@ export async function buildLast30Days(householdId: string, origin: string): Prom
     days.push(summarizeDay(recordsForDate(records, d), d));
   }
   return { days };
+}
+
+export type EnergyDaySegment = {
+  start_hour: number;
+  end_hour: number;
+  kind: "solar" | "battery" | "cheap" | "peak";
+};
+
+export type EnergyDayMetric = {
+  label: string;
+  value: string;
+  sub: string;
+};
+
+export type EnergyDayRecommendation = {
+  title: string;
+  body: string;
+  cta: string;
+  icon: "car" | "thermometer" | "spark";
+  tone: "red" | "amber" | "blue";
+  estimated_savings_eur: number;
+};
+
+export type EnergyDayView = {
+  household: ReturnType<typeof getHouseholdView>["household"];
+  tariff: ReturnType<typeof getHouseholdView>["tariff"];
+  date: string;
+  season: "summer" | "winter";
+  summary: DailySummary;
+  segments: EnergyDaySegment[];
+  metrics: EnergyDayMetric[];
+  recommendations: EnergyDayRecommendation[];
+};
+
+function fallbackDayRecords(householdId: string, date: string): TimeseriesRecord[] {
+  const household = getHousehold(householdId);
+  const tariff = getTariff(household.tariff_id);
+  const month = getMonthlyBillsFor(householdId).find((b) => b.month === date.slice(0, 7));
+  const dailyConsumption = (month?.consumption_kwh ?? 450) / 30;
+  const dailyPv = (month?.pv_production_kwh ?? household.pv_kwp * 80) / 30;
+  const feedPrice = tariff.type === "fixed_rate" ? tariff.energy_rate_eur_per_kwh : 0.42;
+  const records: TimeseriesRecord[] = [];
+
+  for (let i = 0; i < 96; i++) {
+    const hour = Math.floor(i / 4);
+    const minute = (i % 4) * 15;
+    const sun = Math.max(0, Math.sin(((hour + minute / 60 - 6) / 12) * Math.PI));
+    const pvKw = (dailyPv * sun) / 3.8;
+    const evening = hour >= 18 && hour <= 21 ? 1.45 : 1;
+    const baseLoad = (dailyConsumption / 24) * evening;
+    const heatpump = household.heat_pump && date < "2025-03-01" ? 1.2 + (hour >= 18 ? 0.8 : 0) : 0;
+    const ev = household.ev_charger && hour >= 0 && hour < 2 ? 5.5 : 0;
+    const total = baseLoad + heatpump + ev;
+    const price =
+      tariff.type === "fixed_rate"
+        ? tariff.energy_rate_eur_per_kwh
+        : feedPrice + (hour >= 18 && hour <= 20 ? 0.1 : hour >= 11 && hour <= 14 ? -0.06 : 0);
+    const surplus = pvKw - total;
+    const batteryDischarge =
+      surplus < 0 && hour >= 17 && household.battery_kwh > 0
+        ? Math.min(-surplus, household.battery_power_kw, 2.5)
+        : 0;
+    const gridImport = Math.max(0, total - pvKw - batteryDischarge);
+    const gridExport = Math.max(0, surplus);
+    records.push({
+      timestamp: `${date}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`,
+      outdoor_temp_c: date < "2025-03-01" ? 4 : 24,
+      pv_production_kw: pvKw,
+      house_load_kw: baseLoad,
+      heatpump_kw: heatpump,
+      ev_charging_kw: ev,
+      total_consumption_kw: total,
+      battery_charge_kw: gridExport > 0 ? Math.min(gridExport, household.battery_power_kw) : 0,
+      battery_discharge_kw: batteryDischarge,
+      battery_soc_kwh: household.battery_kwh * (hour < 17 ? 0.7 : 0.35),
+      battery_soc_pct: household.battery_kwh > 0 ? (hour < 17 ? 70 : 35) : 0,
+      grid_import_kw: gridImport,
+      grid_export_kw: gridExport,
+      price_eur_per_kwh: price,
+    });
+  }
+  return records;
+}
+
+function hourLabel(hour: number) {
+  return `${String(hour).padStart(2, "0")}:00`;
+}
+
+function mergeSegments(hours: EnergyDaySegment[]): EnergyDaySegment[] {
+  return hours.reduce<EnergyDaySegment[]>((acc, segment) => {
+    const last = acc[acc.length - 1];
+    if (last && last.kind === segment.kind && last.end_hour === segment.start_hour) {
+      last.end_hour = segment.end_hour;
+    } else {
+      acc.push({ ...segment });
+    }
+    return acc;
+  }, []);
+}
+
+export async function buildEnergyDayView(
+  householdId: string,
+  origin: string,
+  season: "summer" | "winter" = "summer",
+): Promise<EnergyDayView> {
+  const household = getHousehold(householdId);
+  const tariff = getTariff(household.tariff_id);
+  const date = season === "summer" ? DEMO_TODAY : "2025-01-15";
+  const records = await getTimeseries(householdId, origin).catch(() =>
+    fallbackDayRecords(householdId, date),
+  );
+  const day = recordsForDate(records, date);
+  const hourly = aggregateHourly(day);
+  const summary = summarizeDay(day, date);
+  const feedIn = "feed_in_eur_per_kwh" in tariff ? tariff.feed_in_eur_per_kwh : 0.081;
+  const prices = hourly.map((h) => h.price_eur_per_kwh);
+  const cheapest = hourly.reduce(
+    (best, h) => (h.price_eur_per_kwh < best.price_eur_per_kwh ? h : best),
+    hourly[0],
+  );
+  const expensive = hourly.reduce(
+    (best, h) => (h.price_eur_per_kwh > best.price_eur_per_kwh ? h : best),
+    hourly[0],
+  );
+  const sortedPrices = [...prices].sort((a, b) => a - b);
+  const peakThreshold = sortedPrices[Math.max(0, Math.floor(sortedPrices.length * 0.75))] ?? 0.5;
+
+  const segments = mergeSegments(
+    hourly.map((h) => {
+      const kind =
+        h.price_eur_per_kwh >= peakThreshold && h.grid_import_kwh > 0.2
+          ? "peak"
+          : h.pv_kwh >= h.consumption_kwh * 0.65
+            ? "solar"
+            : h.battery_soc_pct_end > 35 && h.grid_import_kwh < h.consumption_kwh * 0.45
+              ? "battery"
+              : "cheap";
+      return { start_hour: h.hour, end_hour: h.hour + 1, kind };
+    }),
+  );
+
+  const exported = summary.grid_export_kwh;
+  const evGridKwh = day.reduce(
+    (sum, r) => sum + Math.min(r.ev_charging_kw, r.grid_import_kw) * STEP_H,
+    0,
+  );
+  const evGridCost = day.reduce(
+    (sum, r) => sum + Math.min(r.ev_charging_kw, r.grid_import_kw) * STEP_H * r.price_eur_per_kwh,
+    0,
+  );
+  const peakLoadKwh = hourly
+    .filter((h) => h.hour >= 18 && h.hour < 21)
+    .reduce((sum, h) => sum + h.grid_import_kwh, 0);
+  const peakAvg = hourly
+    .filter((h) => h.hour >= 18 && h.hour < 21)
+    .reduce((sum, h, _, arr) => sum + h.price_eur_per_kwh / Math.max(arr.length, 1), 0);
+
+  const recs: EnergyDayRecommendation[] = [
+    {
+      title: household.ev_charger
+        ? `Move EV charging to ${hourLabel(cheapest.hour)}`
+        : `Run flexible appliances at ${hourLabel(cheapest.hour)}`,
+      body: household.ev_charger
+        ? `Your EV uses ${round(evGridKwh, 1)} kWh from the grid today. Moving it from costly hours toward ${hourLabel(cheapest.hour)} at €${cheapest.price_eur_per_kwh.toFixed(2)}/kWh and available solar export can save about €${round(Math.max(0, evGridCost - evGridKwh * Math.max(feedIn, cheapest.price_eur_per_kwh - 0.08)), 2).toFixed(2)}.`
+        : `Your cheapest flexible-load window is ${hourLabel(cheapest.hour)} at €${cheapest.price_eur_per_kwh.toFixed(2)}/kWh. Shift dishwasher, laundry, or drying away from peak grid hours.`,
+      cta: household.ev_charger ? "Why can't the battery cover it?" : "Plan flexible loads",
+      icon: "car",
+      tone: "red",
+      estimated_savings_eur: round(
+        Math.max(0, evGridCost - evGridKwh * Math.max(feedIn, cheapest.price_eur_per_kwh - 0.08)),
+        2,
+      ),
+    },
+    {
+      title: household.heat_pump
+        ? `Pre-heat the house at ${hourLabel(cheapest.hour)}`
+        : `Use solar surplus around ${hourLabel(cheapest.hour)}`,
+      body: household.heat_pump
+        ? `The cheapest hour is ${hourLabel(cheapest.hour)} (€${cheapest.price_eur_per_kwh.toFixed(2)}/kWh) while peak hits ${hourLabel(expensive.hour)} (€${expensive.price_eur_per_kwh.toFixed(2)}/kWh). Pre-heating with cheap solar/grid energy avoids roughly €${round(Math.max(0, (expensive.price_eur_per_kwh - cheapest.price_eur_per_kwh) * Math.max(2, summary.heatpump_kwh * 0.18)), 2).toFixed(2)}.`
+        : `You export ${exported.toFixed(1)} kWh today at €${feedIn.toFixed(2)}/kWh. Use that surplus locally instead of buying later at €${expensive.price_eur_per_kwh.toFixed(2)}/kWh.`,
+      cta: household.heat_pump ? "Set up a pre-heat schedule" : "Use solar locally",
+      icon: "thermometer",
+      tone: "amber",
+      estimated_savings_eur: round(
+        Math.max(
+          0,
+          (expensive.price_eur_per_kwh - cheapest.price_eur_per_kwh) *
+            Math.max(2, summary.heatpump_kwh * 0.18),
+        ),
+        2,
+      ),
+    },
+    {
+      title: "Avoid heavy loads 18:00–20:00",
+      body: `Evening peak averages €${peakAvg.toFixed(2)}/kWh with little solar left. Holding ${round(Math.min(peakLoadKwh, 4), 1)} kWh of discretionary load until a cheaper period could save about €${round(Math.max(0, (peakAvg - cheapest.price_eur_per_kwh) * Math.min(peakLoadKwh, 4)), 2).toFixed(2)}.`,
+      cta: "Show peak-hour plan",
+      icon: "spark",
+      tone: "blue",
+      estimated_savings_eur: round(
+        Math.max(0, (peakAvg - cheapest.price_eur_per_kwh) * Math.min(peakLoadKwh, 4)),
+        2,
+      ),
+    },
+  ].sort((a, b) => b.estimated_savings_eur - a.estimated_savings_eur);
+
+  return {
+    household,
+    tariff,
+    date,
+    season,
+    summary,
+    segments,
+    metrics: [
+      {
+        label: "Solar given away today",
+        value: `${exported.toFixed(0)} kWh`,
+        sub: `sold at €${feedIn.toFixed(2)}`,
+      },
+      {
+        label: "Cheapest hour",
+        value: `€${cheapest.price_eur_per_kwh.toFixed(2)}`,
+        sub: `${hourLabel(cheapest.hour)} solar dip`,
+      },
+      {
+        label: "Most expensive hour",
+        value: `€${expensive.price_eur_per_kwh.toFixed(2)}`,
+        sub: `${hourLabel(expensive.hour)} peak`,
+      },
+      {
+        label: household.ev_charger ? "Car charged from grid" : "Grid imported today",
+        value: `${(household.ev_charger ? evGridKwh : summary.grid_import_kwh).toFixed(0)} kWh`,
+        sub: `cost €${(household.ev_charger ? evGridCost : summary.energy_cost_eur).toFixed(2)}`,
+      },
+    ],
+    recommendations: recs.slice(0, 3),
+  };
 }
 
 // ---- Reference passthroughs ----
