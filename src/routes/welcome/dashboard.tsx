@@ -38,16 +38,15 @@ function WelcomeDashboardPage() {
     <div className="min-h-screen bg-background">
       <header className="border-b border-[color:var(--border)] bg-white">
         <div className="mx-auto flex max-w-[720px] items-center justify-between px-5 py-4">
-          <Link to="/" search={{ hh: hhId }} className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--brand-navy)] text-[12px] font-bold text-white">
-              P
+          <Link to="/" className="flex items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-cta text-navy font-display text-[12px]">
+              E
             </div>
-            <span className="text-[14px] font-semibold text-[var(--brand-navy)]">Pulse</span>
+            <span className="text-[14px] font-semibold text-navy">Enpal Pulse</span>
           </Link>
           <Link
             to="/welcome"
-            search={{ hh: hhId }}
-            className="text-[14px] font-medium text-[var(--brand-stone)] underline-offset-4 hover:underline"
+            className="text-[14px] font-medium text-stone underline-offset-4 hover:underline"
           >
             Redo setup
           </Link>
@@ -67,7 +66,7 @@ function WelcomeDashboardPage() {
           {!data ? (
             <p className="mt-3 text-[15px] text-[var(--brand-navy)]">
               No answers yet —{" "}
-              <Link to="/welcome" search={{ hh: hhId }} className="font-semibold underline">
+              <Link to="/welcome" className="font-semibold underline">
                 start setup
               </Link>
               .

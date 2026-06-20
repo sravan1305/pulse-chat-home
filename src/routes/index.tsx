@@ -1,6 +1,7 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
 import { ArrowRight, FileText, MessageCircle, Settings } from "lucide-react";
+import { useEffect } from "react";
 import { z } from "zod";
 
 import { AppShell, useActiveHouseholdId } from "@/components/AppShell";
@@ -9,6 +10,7 @@ import { HomeHeader, type CmpMode } from "@/components/HomeHeader";
 import { ComparisonStrip } from "@/components/ComparisonStrip";
 import { getHomeComparisonFn } from "@/lib/data-functions";
 import { DEFAULT_HOUSEHOLD_ID, DEMO_NOW_HOUR, DEMO_TODAY } from "@/lib/demo-config";
+import { loadOnboarding } from "@/lib/onboarding";
 
 const searchSchema = z.object({
   hh: z.string().optional(),
@@ -55,6 +57,11 @@ export const Route = createFileRoute("/")({
 });
 
 function HomePage() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (!loadOnboarding()?.household_id) navigate({ to: "/welcome" });
+  }, [navigate]);
+
   const householdId = useActiveHouseholdId();
   const search = Route.useSearch();
   const date = search.date ?? DEMO_TODAY;
@@ -161,7 +168,7 @@ function HomePage() {
                   <div className="mt-5 flex flex-wrap gap-3">
                     <Link
                       to="/chat"
-                      search={{ hh: householdId, q: featured.suggested_action }}
+                      search={{ q: featured.suggested_action }}
                       className="btn-cta"
                     >
                       {featured.suggested_action}
@@ -177,7 +184,6 @@ function HomePage() {
         <section className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <Link
             to="/chat"
-            search={{ hh: householdId }}
             className="card-soft p-5 flex items-center justify-between hover:shadow-lg transition group"
           >
             <div className="flex items-center gap-3">
@@ -193,7 +199,7 @@ function HomePage() {
           </Link>
           <Link
             to="/chat"
-            search={{ hh: householdId, q: "Show me my contract details" }}
+            search={{ q: "Show me my contract details" }}
             className="card-soft p-5 flex items-center justify-between hover:shadow-lg transition group"
           >
             <div className="flex items-center gap-3">
