@@ -632,16 +632,19 @@ export function OnboardingChat() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      {/* Top bar */}
-      <header className="sticky top-0 z-10 border-b border-[color:var(--border)] bg-white/90 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-[480px] items-center justify-between px-5 py-4">
-          <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--brand-navy)] text-[12px] font-bold text-white">
-              P
+      {/* Top bar — matches AppShell branding */}
+      <header className="sticky top-0 z-10 bg-navy text-white">
+        <div className="mx-auto flex w-full max-w-[560px] items-center justify-between gap-4 px-5 py-4">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-cta">
+              <span className="font-display text-lg text-navy">E</span>
             </div>
-            <span className="text-[14px] font-semibold text-[var(--brand-navy)]">Pulse</span>
+            <div className="leading-tight">
+              <div className="font-display text-base text-white">Enpal Pulse</div>
+              <div className="-mt-0.5 text-[11px] text-white/60">Quick setup</div>
+            </div>
           </div>
-          <div className="flex-1 px-6">
+          <div className="flex-1 px-4">
             <ProgressDots total={TOTAL_DOTS} current={stepProgress(step)} />
           </div>
           <div className="w-12 text-right">{showSkip && <SkipLink onClick={skip} />}</div>
@@ -649,7 +652,7 @@ export function OnboardingChat() {
       </header>
 
       {/* Chat thread */}
-      <main className="mx-auto flex w-full max-w-[480px] flex-1 flex-col gap-4 px-5 py-6">
+      <main className="mx-auto flex w-full max-w-[560px] flex-1 flex-col gap-4 px-5 py-6">
         <ChatScroller>
           {(() => {
             // Find the most recent user message that can be undone.
