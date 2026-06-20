@@ -106,7 +106,6 @@ function SettingsPage() {
     );
   }
 
-  const setHousehold = (id: string) => setDraft((d) => ({ ...d, household_id: id }));
 
   const toggleAppliance = (t: ApplianceType) => {
     setDraft((d) => {
