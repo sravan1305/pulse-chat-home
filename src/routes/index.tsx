@@ -57,6 +57,11 @@ export const Route = createFileRoute("/")({
 });
 
 function HomePage() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (!loadOnboarding()?.household_id) navigate({ to: "/welcome" });
+  }, [navigate]);
+
   const householdId = useActiveHouseholdId();
   const search = Route.useSearch();
   const date = search.date ?? DEMO_TODAY;
