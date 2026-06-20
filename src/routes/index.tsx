@@ -227,7 +227,7 @@ function HomePage() {
             <ArrowRight className="w-5 h-5 text-stone group-hover:text-navy transition" />
           </Link>
           <Link
-            to="/welcome"
+            to="/settings"
             className="card-soft p-5 flex items-center justify-between hover:shadow-lg transition group"
           >
             <div className="flex items-center gap-3">
