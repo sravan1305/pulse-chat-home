@@ -66,7 +66,7 @@ function WelcomeDashboardPage() {
           {!data ? (
             <p className="mt-3 text-[15px] text-[var(--brand-navy)]">
               No answers yet —{" "}
-              <Link to="/welcome" search={{ hh: hhId }} className="font-semibold underline">
+              <Link to="/welcome" className="font-semibold underline">
                 start setup
               </Link>
               .
