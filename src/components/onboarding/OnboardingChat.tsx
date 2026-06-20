@@ -1,4 +1,4 @@
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChatBubble,
@@ -23,6 +23,11 @@ import {
   type SmartState,
   saveOnboarding,
 } from "@/lib/onboarding";
+import householdsRaw from "@/data/raw/households.json";
+import { DEFAULT_HOUSEHOLD_ID } from "@/lib/demo-config";
+
+type HouseholdLite = { household_id: string; name: string; city: string };
+const HOUSEHOLDS = householdsRaw as HouseholdLite[];
 
 // Mock — in real app these come from the account.
 const ACCOUNT_HAS_EV_CHARGER = true;
