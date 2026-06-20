@@ -59,6 +59,7 @@ export const Route = createFileRoute("/")({
 function HomePage() {
   const navigate = useNavigate();
   useEffect(() => {
+    console.log("[home] effect fired, onboarding:", loadOnboarding());
     if (!loadOnboarding()?.household_id) navigate({ to: "/welcome" });
   }, [navigate]);
 
