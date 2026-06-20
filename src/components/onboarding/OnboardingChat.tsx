@@ -571,7 +571,11 @@ export function OnboardingChat() {
 
   function DoneControls() {
     return (
-      <PrimaryButton onClick={() => navigate({ to: "/welcome/dashboard" })}>
+      <PrimaryButton
+        onClick={() =>
+          navigate({ to: "/welcome/dashboard", search: { hh: selectedHouseholdId } })
+        }
+      >
         Go to my dashboard →
       </PrimaryButton>
     );
