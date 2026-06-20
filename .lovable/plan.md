@@ -1,86 +1,32 @@
-# Date-aware Home with "vs baseline" comparison
+## Goal
 
-Turn the Home view into a time-travel dashboard: pick any date in the 2025 dataset, pick a baseline (1 week / 1 month / synthetic "last year"), and see the live snapshot and day totals next to the baseline with deltas.
+Add a "Which home is this for?" step at the start of the `/welcome` onboarding flow, so the household is chosen as part of onboarding instead of only via the header dropdown. Also fix the current `/` 500 error (stale `summaryQueryOptions` reference in the loader) that's blocking the page.
 
-## UX
+## Changes
 
-Home header (replaces the static date line):
+### 1. Fix `/` runtime 500 (blocker)
+`src/routes/index.tsx` loader still calls `summaryQueryOptions(deps.hh)`, which no longer exists after the comparison refactor. Replace with `homeQueryOptions({ householdId, date: DEMO_TODAY, hour: DEMO_NOW_HOUR, cmp: "1w" })` using the same defaults the component uses, and include `date`/`cmp` in `loaderDeps`.
 
-```text
-Good day, Müller Family
-┌─────────────────────────────────────────────────────────────┐
-│ [📅 Sun, 15 Jun 2025 ▾]   compare to:  (1w) (1mo) (1y)*    │
-│ Munich · 22 °C  ·  baseline: Sun 8 Jun 2025 · 18 °C ☁       │
-└─────────────────────────────────────────────────────────────┘
-```
+### 2. New first onboarding step: `household`
+In `src/components/onboarding/OnboardingChat.tsx`:
+- Add `{ kind: "household" }` to the `Step` union and insert it right after `welcome` (before `appliances`).
+- Add `selectedHouseholdId` state, defaulting to the current `?hh=` search param if present, else `DEFAULT_HOUSEHOLD_ID`.
+- Render the question as a normal chat bubble: "Which home are we setting up?" with one option button per household from `src/data/raw/households.json` (`Name · City`). Reuse the existing `ChoiceButton` / `PrimaryButton` primitives — no new UI components.
+- Selecting a household: advances to `appliances`, and immediately updates the URL with `?hh=<id>` via `navigate({ to: "/welcome", search: { hh: id } })` so the rest of the flow (and the header) reflects the choice.
+- Bump `TOTAL_DOTS` to 8 and shift `stepProgress` numbers down by 1 for every later step so the progress dots stay accurate.
 
-- Date picker = shadcn `Calendar` in a `Popover`, constrained to the dates available in the active household's timeseries.
-- Baseline toggle = 3-option segmented control. `1y` is a synthetic shift (same calendar day, label says "vs last year" but pulls from the same 2025 dataset shifted by ±N days — see Technical).
-- Whole Home view (live tiles, chips, insight) reflects the **selected** date/hour.
-- A new compact **"vs baseline" strip** sits under the EnergyFlow panel.
+### 3. Persist household with onboarding answers
+- Extend `OnboardingAnswers` in `src/lib/onboarding.ts` with `household_id?: string`, and write it in the final `saveOnboarding` call inside `OnboardingChat`.
+- On the `done` step, "Go to dashboard" already navigates to `/welcome/dashboard`; update that navigation (and the dashboard's "Redo setup" link) to carry `?hh=<selectedHouseholdId>` so the chosen home survives the handoff back to Home.
 
-The strip shows 4 metrics with delta arrows and color (grass = better, red = worse):
+### 4. Welcome route accepts `?hh=`
+`src/routes/welcome/index.tsx`: add a `validateSearch` accepting `{ hh?: string }` so the step can read/write it without TanStack stripping the param. No UI change here.
 
-```text
-┌──────────────┬──────────────┬──────────────┬──────────────┐
-│ Solar today  │ Used today   │ Self-suff.   │ Day cost     │
-│ 32.4 kWh     │ 21.8 kWh     │ 78 %         │ € 1.42       │
-│ ↑ +4.1 kWh   │ ↓ −2.0 kWh   │ ↑ +9 pp      │ ↓ −€0.61     │
-│ vs 8 Jun     │ vs 8 Jun     │ vs 8 Jun     │ vs 8 Jun     │
-└──────────────┴──────────────┴──────────────┴──────────────┘
-```
-
-Live tile panel (`EnergyFlow`) gains a one-line footer:
-
-> *At 14:00 on 8 Jun: 4.1 kW solar, 1.2 kW grid import, 12 °C cloudier.*
-
-Existing chips (Solar today / Used today / Saved vs last mo / etc.) stay; the Insight card stays.
-
-## Data model & technical details
-
-State lives in URL search params on `/`:
-
-- `hh` (existing) — household id
-- `date` — `YYYY-MM-DD`, defaults to `DEMO_TODAY` (2025-06-15)
-- `hour` — `0-23`, defaults to `DEMO_NOW_HOUR` (14). Reserved for a future hour slider; for now set via picker quick-actions.
-- `cmp` — `"1w" | "1mo" | "1y"`, default `"1w"`
-
-Validated via `zodValidator` + `fallback`. Declared in `loaderDeps` so the loader re-runs on change.
-
-New server function `getHomeComparisonFn({ householdId, date, hour, cmp })` in `src/lib/data-functions.ts`:
-
-1. Load the household timeseries (existing `getTimeseries`).
-2. Build `TodayView` for `date` (refactor `buildTodayView` in `src/lib/aggregations.server.ts` to accept a `date` + `hour` instead of hardcoded `DEMO_TODAY` / `DEMO_NOW_HOUR`; pass defaults from current constants for backward compat).
-3. Compute baseline date:
-   - `1w` → date − 7 days
-   - `1mo` → date − 30 days (or same day-of-month if available)
-   - `1y` → date − 365 days; if outside the dataset range (it will be, since data is 2025-only), fall back to the same calendar date in the dataset and **label** as "vs last year" — note in tooltip: "Demo: synthesized from 2025 data."
-4. Build a second `TodayView` for the baseline date.
-5. Return `{ today: TodayView, baseline: TodayView, baselineDate, cmp, weatherDelta }`.
-
-`weatherDelta` = `{ today_temp_c, baseline_temp_c, label }` derived from `outdoor_temp_c` at the selected hour on each date.
-
-Home route (`src/routes/index.tsx`):
-
-- Add `validateSearch`, `loaderDeps`, swap to `getHomeComparisonFn`.
-- New `<HomeHeader />` component with date popover + cmp segmented control; updates URL via `useNavigate({ search: prev => ({...prev, date, cmp}) })`.
-- New `<ComparisonStrip today={...} baseline={...} />` component rendered between `<EnergyFlow>` and the chips grid.
-- `<EnergyFlow snapshot={today.now}>` extended with optional `baselineSnapshot` prop to render the one-line baseline footer (no animation changes).
-
-Date-picker bounds: derive min/max from the timeseries (first/last record). Disable days outside.
-
-## Files
-
-- `src/routes/index.tsx` — add search schema, loaderDeps, header & strip, swap fn.
-- `src/lib/aggregations.server.ts` — parameterize `buildTodayView(hh, date, hour)`; keep existing callers working with default args.
-- `src/lib/data-functions.ts` — add `getHomeComparisonFn`.
-- `src/components/HomeHeader.tsx` *(new)* — date popover + cmp toggle.
-- `src/components/ComparisonStrip.tsx` *(new)* — 4-metric delta strip.
-- `src/components/EnergyFlow.tsx` — optional `baselineSnapshot` footer line.
+### 5. Show the chosen household on the dashboard
+`src/routes/welcome/dashboard.tsx`: when `data.household_id` is set, look up the matching entry in `households.json` and show it as a `Row` ("Home: Müller · Berlin") above "Appliances". Pure presentation, no logic changes elsewhere.
 
 ## Out of scope
 
-- Hour scrubber (URL key reserved, UI deferred).
-- Persisting last-picked date across sessions.
-- Charts overlay (today vs baseline curves) — could be a follow-up.
-- New routes; everything stays on `/`.
+- No first-visit redirect / gating (that's option 1, not requested).
+- No per-household keyed answers (that's option 2). Onboarding remains a single shared record; we just record which home it was completed for.
+- No changes to `AppShell`'s header household picker — it keeps working as today.
