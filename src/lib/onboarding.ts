@@ -23,6 +23,7 @@ export interface DeadlineEntry {
 }
 
 export interface OnboardingAnswers {
+  household_id?: string;
   appliances: ApplianceAnswer[];
   overnight_preference?: OvernightPref;
   deadlines: DeadlineEntry[];
