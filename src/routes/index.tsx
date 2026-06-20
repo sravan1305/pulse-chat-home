@@ -1,13 +1,14 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
 import { ArrowRight, FileText, MessageCircle, Settings } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { z } from "zod";
 
 import { AppShell, useActiveHouseholdId } from "@/components/AppShell";
 import { EnergyFlow } from "@/components/EnergyFlow";
 import { HomeHeader, type CmpMode } from "@/components/HomeHeader";
 import { ComparisonStrip } from "@/components/ComparisonStrip";
+import { OnboardingChat } from "@/components/onboarding/OnboardingChat";
 import { getHomeComparisonFn } from "@/lib/data-functions";
 import { DEFAULT_HOUSEHOLD_ID, DEMO_NOW_HOUR, DEMO_TODAY } from "@/lib/demo-config";
 import { loadOnboarding } from "@/lib/onboarding";
@@ -53,15 +54,27 @@ export const Route = createFileRoute("/")({
       },
     ],
   }),
-  component: HomePage,
+  component: HomeGate,
 });
 
-function HomePage() {
-  const navigate = useNavigate();
-  useEffect(() => {
-    if (!loadOnboarding()?.household_id) navigate({ to: "/welcome" });
-  }, [navigate]);
+function HomeGate() {
+  // SSR / first paint: assume not-yet-known. Decide on the client to avoid hydration mismatch.
+  const [state, setState] = useState<"loading" | "onboarding" | "ready">("loading");
 
+  useEffect(() => {
+    setState(loadOnboarding()?.household_id ? "ready" : "onboarding");
+  }, []);
+
+  if (state === "loading") {
+    return <div className="min-h-screen bg-background" />;
+  }
+  if (state === "onboarding") {
+    return <OnboardingChat onComplete={() => setState("ready")} />;
+  }
+  return <HomePage />;
+}
+
+function HomePage() {
   const householdId = useActiveHouseholdId();
   const search = Route.useSearch();
   const date = search.date ?? DEMO_TODAY;
@@ -214,7 +227,7 @@ function HomePage() {
             <ArrowRight className="w-5 h-5 text-stone group-hover:text-navy transition" />
           </Link>
           <Link
-            to="/welcome"
+            to="/settings"
             className="card-soft p-5 flex items-center justify-between hover:shadow-lg transition group"
           >
             <div className="flex items-center gap-3">
