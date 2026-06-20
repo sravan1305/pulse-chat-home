@@ -273,6 +273,7 @@ export function OnboardingChat() {
       );
       // Persist
       const payload: OnboardingAnswers = {
+        household_id: selectedHouseholdId,
         appliances: appliances.map<ApplianceAnswer>((type) => ({
           type,
           smart: smartByAppliance[type] ?? "not_sure",
