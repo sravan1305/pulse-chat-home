@@ -623,7 +623,7 @@ export function OnboardingChat() {
         setStep({ kind: "done" });
         break;
       case "done":
-        navigate({ to: "/welcome/dashboard", search: { hh: selectedHouseholdId } });
+        navigate({ to: "/welcome/dashboard" });
         break;
     }
   }
