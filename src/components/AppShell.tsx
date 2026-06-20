@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ChevronDown, Home, LogOut, MessageCircle, Settings, Sparkles } from "lucide-react";
+import { ChevronDown, Home, House, LogOut, MessageCircle, Settings, Sparkles } from "lucide-react";
 import { useMemo, type ReactNode } from "react";
 
 import households from "@/data/raw/households.json";
@@ -16,8 +16,9 @@ import { DEFAULT_HOUSEHOLD_ID } from "@/lib/demo-config";
 
 const NAV = [
   { to: "/", label: "Home", icon: Home },
-  { to: "/chat", label: "Chat", icon: MessageCircle },
+  { to: "/my-home", label: "My Home", icon: House },
   { to: "/insights", label: "Insights", icon: Sparkles },
+  { to: "/chat", label: "Chat", icon: MessageCircle },
 ] as const;
 
 type HouseholdLite = { household_id: string; name: string; city: string };
@@ -117,7 +118,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* Mobile bottom nav */}
       <nav className="sm:hidden fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur border-t border-border z-50">
-        <div className="mx-auto max-w-5xl grid grid-cols-3">
+        <div className="mx-auto max-w-5xl grid grid-cols-4">
           {NAV.map((item) => {
             const Icon = item.icon;
             return (
