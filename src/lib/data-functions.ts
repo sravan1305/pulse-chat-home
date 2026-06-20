@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import {
   buildComparisonView,
+  buildEnergyDayView,
   buildLast30Days,
   buildTodayView,
   buildWeeklyView,
@@ -16,10 +17,17 @@ import { listHouseholds } from "./data-loader.server";
 import { DEMO_NOW_HOUR, DEMO_TODAY } from "./demo-config";
 
 const householdInput = z.object({ householdId: z.string() });
+const energyDayInput = z.object({
+  householdId: z.string(),
+  season: z.enum(["summer", "winter"]).default("summer"),
+});
 
 const homeInput = z.object({
   householdId: z.string(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).default(DEMO_TODAY),
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .default(DEMO_TODAY),
   hour: z.number().int().min(0).max(23).default(DEMO_NOW_HOUR),
   cmp: z.enum(["1w", "1mo", "1y"]).default("1w"),
 });
@@ -66,6 +74,10 @@ export const getWeeklyViewFn = createServerFn({ method: "POST" })
     ]);
     return { weekly, insights, bills };
   });
+
+export const getEnergyDayFn = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => energyDayInput.parse(input))
+  .handler(async ({ data }) => buildEnergyDayView(data.householdId, origin(), data.season));
 
 export const getContractFn = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => householdInput.parse(input))
