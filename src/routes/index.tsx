@@ -1,17 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
 import { ArrowRight, FileText, MessageCircle, Settings } from "lucide-react";
-import { useEffect, useState } from "react";
 import { z } from "zod";
 
 import { AppShell, useActiveHouseholdId } from "@/components/AppShell";
+import { SignIn } from "@/components/auth/SignIn";
 import { EnergyFlow } from "@/components/EnergyFlow";
 import { HomeHeader, type CmpMode } from "@/components/HomeHeader";
 import { ComparisonStrip } from "@/components/ComparisonStrip";
 import { OnboardingChat } from "@/components/onboarding/OnboardingChat";
+import { useAuth } from "@/contexts/AuthContext";
 import { getHomeComparisonFn } from "@/lib/data-functions";
 import { DEFAULT_HOUSEHOLD_ID, DEMO_NOW_HOUR, DEMO_TODAY } from "@/lib/demo-config";
-import { loadOnboarding } from "@/lib/onboarding";
 
 const searchSchema = z.object({
   hh: z.string().optional(),
@@ -58,19 +58,11 @@ export const Route = createFileRoute("/")({
 });
 
 function HomeGate() {
-  // SSR / first paint: assume not-yet-known. Decide on the client to avoid hydration mismatch.
-  const [state, setState] = useState<"loading" | "onboarding" | "ready">("loading");
+  const { user, onboarding, ready, refresh } = useAuth();
 
-  useEffect(() => {
-    setState(loadOnboarding()?.household_id ? "ready" : "onboarding");
-  }, []);
-
-  if (state === "loading") {
-    return <div className="min-h-screen bg-background" />;
-  }
-  if (state === "onboarding") {
-    return <OnboardingChat onComplete={() => setState("ready")} />;
-  }
+  if (!ready) return <div className="min-h-screen bg-background" />;
+  if (!user) return <SignIn />;
+  if (!onboarding?.household_id) return <OnboardingChat onComplete={refresh} />;
   return <HomePage />;
 }
 
