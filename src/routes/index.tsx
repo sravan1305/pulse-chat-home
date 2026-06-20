@@ -75,6 +75,7 @@ function HomeGate() {
 }
 
 function HomePage() {
+  const householdId = useActiveHouseholdId();
   const search = Route.useSearch();
   const date = search.date ?? DEMO_TODAY;
   const hour = search.hour ?? DEMO_NOW_HOUR;
