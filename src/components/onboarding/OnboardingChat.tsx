@@ -242,7 +242,9 @@ export function OnboardingChat() {
       suppressInitialAskRef.current = false;
       return;
     }
-    if (step.kind === "appliances") {
+    if (step.kind === "household") {
+      ask("Which home are we setting up?");
+    } else if (step.kind === "appliances") {
       ask("Which of these do you have at home?");
     } else if (step.kind === "smart") {
       const t = appliances[step.idx];
