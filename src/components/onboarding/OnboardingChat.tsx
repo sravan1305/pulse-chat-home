@@ -230,7 +230,7 @@ export function OnboardingChat() {
   // Bootstrap welcome message
   useEffect(() => {
     ask(
-      "A few quick questions so we can give you the right tips — not generic ones. Takes about a minute. You can skip anything.",
+      "Welcome to Enpal Pulse. A minute of setup so we can give you tips tailored to your home — not generic ones. You can skip anything.",
     );
   }, []);
 
