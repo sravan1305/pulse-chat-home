@@ -184,7 +184,6 @@ function HomePage() {
         <section className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <Link
             to="/chat"
-            search={{ hh: householdId }}
             className="card-soft p-5 flex items-center justify-between hover:shadow-lg transition group"
           >
             <div className="flex items-center gap-3">
@@ -200,7 +199,7 @@ function HomePage() {
           </Link>
           <Link
             to="/chat"
-            search={{ hh: householdId, q: "Show me my contract details" }}
+            search={{ q: "Show me my contract details" }}
             className="card-soft p-5 flex items-center justify-between hover:shadow-lg transition group"
           >
             <div className="flex items-center gap-3">
