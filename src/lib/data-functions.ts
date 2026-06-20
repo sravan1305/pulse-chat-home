@@ -11,6 +11,7 @@ import {
   getHouseholdView,
   getInsightsView,
   getMonthlyBillsView,
+  summarizeYear,
 } from "./aggregations.server";
 import { listHouseholds } from "./data-loader.server";
 import { DEMO_NOW_HOUR, DEMO_TODAY } from "./demo-config";

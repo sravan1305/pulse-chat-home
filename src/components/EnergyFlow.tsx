@@ -86,10 +86,12 @@ export function EnergyFlow({
   snapshot,
   baselineSnapshot,
   baselineDate,
+  compact = false,
 }: {
   snapshot: EnergyFlowSnapshot;
   baselineSnapshot?: EnergyFlowSnapshot & { outdoor_temp_c?: number };
   baselineDate?: string;
+  compact?: boolean;
 }) {
   const s = snapshot;
   const exporting = s.grid_export_kw > 0.05;
@@ -178,7 +180,7 @@ export function EnergyFlow({
       </div>
 
       {/* Tiles */}
-      <div className="px-6 md:px-8 pb-7 mt-4 grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className={`px-6 md:px-8 pb-7 mt-4 grid grid-cols-2 gap-3 ${compact ? "md:grid-cols-3" : "md:grid-cols-5"}`}>
         <Tile
           icon={<Sun className="w-4 h-4" />}
           label="Solar"
@@ -206,25 +208,29 @@ export function EnergyFlow({
           tone={exporting ? "produce" : importing ? "consume" : "idle"}
           arrow={exporting ? <ArrowUp className="w-4 h-4" /> : importing ? <ArrowDown className="w-4 h-4" /> : null}
         />
-        <Tile
-          icon={<Flame className="w-4 h-4" />}
-          label="Heat pump"
-          value={fmt(s.heatpump_kw)}
-          unit="kW"
-          state={hpOn ? "Heating" : "Off"}
-          tone={hpOn ? "consume" : "idle"}
-        />
-        <Tile
-          icon={<Car className="w-4 h-4" />}
-          label="EV"
-          value={fmt(s.ev_kw)}
-          unit="kW"
-          state={evOn ? "Charging" : "Not plugged in"}
-          tone={evOn ? "consume" : "idle"}
-        />
+        {!compact && (
+          <>
+            <Tile
+              icon={<Flame className="w-4 h-4" />}
+              label="Heat pump"
+              value={fmt(s.heatpump_kw)}
+              unit="kW"
+              state={hpOn ? "Heating" : "Off"}
+              tone={hpOn ? "consume" : "idle"}
+            />
+            <Tile
+              icon={<Car className="w-4 h-4" />}
+              label="EV"
+              value={fmt(s.ev_kw)}
+              unit="kW"
+              state={evOn ? "Charging" : "Not plugged in"}
+              tone={evOn ? "consume" : "idle"}
+            />
+          </>
+        )}
       </div>
 
-      {baselineSnapshot && baselineDate && (
+      {!compact && baselineSnapshot && baselineDate && (
         <div
           className="px-6 md:px-8 py-3 border-t text-xs flex flex-wrap items-center gap-x-3 gap-y-1"
           style={{ borderColor: C.border, color: C.text, background: "rgba(0,0,0,0.12)" }}
