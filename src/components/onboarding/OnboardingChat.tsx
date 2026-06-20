@@ -1,4 +1,4 @@
-import { useNavigate, useSearch } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChatBubble,
@@ -110,14 +110,10 @@ function stepProgress(step: Step): number {
   }
 }
 
-export function OnboardingChat() {
+export function OnboardingChat({ onComplete }: { onComplete?: () => void } = {}) {
   const navigate = useNavigate();
-  const search = useSearch({ from: "/welcome/" });
-  const initialHh =
-    search.hh && HOUSEHOLDS.some((h) => h.household_id === search.hh)
-      ? search.hh
-      : DEFAULT_HOUSEHOLD_ID;
-  const [selectedHouseholdId, setSelectedHouseholdId] = useState<string>(initialHh);
+  const [selectedHouseholdId, setSelectedHouseholdId] =
+    useState<string>(DEFAULT_HOUSEHOLD_ID);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [step, setStep] = useState<Step>({ kind: "welcome" });
   const [typing, setTyping] = useState(false);
@@ -322,7 +318,6 @@ export function OnboardingChat() {
       const h = HOUSEHOLDS.find((x) => x.household_id === id);
       if (!h) return;
       setSelectedHouseholdId(id);
-      navigate({ to: "/welcome" });
       reply(`${h.name} · ${h.city}`);
       setStep({ kind: "appliances" });
     };
@@ -571,7 +566,12 @@ export function OnboardingChat() {
 
   function DoneControls() {
     return (
-      <PrimaryButton onClick={() => navigate({ to: "/welcome/dashboard" })}>
+      <PrimaryButton
+        onClick={() => {
+          if (onComplete) onComplete();
+          else navigate({ to: "/" });
+        }}
+      >
         Go to my dashboard →
       </PrimaryButton>
     );
@@ -623,7 +623,8 @@ export function OnboardingChat() {
         setStep({ kind: "done" });
         break;
       case "done":
-        navigate({ to: "/welcome/dashboard" });
+        if (onComplete) onComplete();
+        else navigate({ to: "/" });
         break;
     }
   }
