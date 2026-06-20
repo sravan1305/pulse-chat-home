@@ -313,7 +313,31 @@ export function OnboardingChat() {
 
   function WelcomeControls() {
     return (
-      <PrimaryButton onClick={() => setStep({ kind: "appliances" })}>Let's go →</PrimaryButton>
+      <PrimaryButton onClick={() => setStep({ kind: "household" })}>Let's go →</PrimaryButton>
+    );
+  }
+
+  function HouseholdControls() {
+    const pick = (id: string) => {
+      const h = HOUSEHOLDS.find((x) => x.household_id === id);
+      if (!h) return;
+      setSelectedHouseholdId(id);
+      navigate({ to: "/welcome", search: { hh: id } });
+      reply(`${h.name} · ${h.city}`);
+      setStep({ kind: "appliances" });
+    };
+    return (
+      <div className="flex flex-wrap gap-2">
+        {HOUSEHOLDS.map((h) => (
+          <Chip
+            key={h.household_id}
+            selected={selectedHouseholdId === h.household_id}
+            onClick={() => pick(h.household_id)}
+          >
+            {h.name} · {h.city}
+          </Chip>
+        ))}
+      </div>
     );
   }
 
