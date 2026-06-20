@@ -695,6 +695,7 @@ export function OnboardingChat() {
         {!typing && (
           <div className="pulse-enter mt-2">
             {step.kind === "welcome" && <WelcomeControls />}
+            {step.kind === "household" && <HouseholdControls />}
             {step.kind === "appliances" && <AppliancesControls />}
             {step.kind === "smart" && <SmartControls idx={step.idx} />}
             {step.kind === "frequency" && <FrequencyControls idx={step.idx} />}
