@@ -1,15 +1,13 @@
-import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
+
 import {
-  ChatBubble,
-  ChatScroller,
-  Chip,
-  PrimaryButton,
-  ProgressDots,
-  SkipLink,
-  TypingBubble,
-  UndoLink,
-} from "@/components/onboarding/chat-primitives";
+  AssistantBubble,
+  ChatSurface,
+  ChoiceChip,
+  Composer,
+  UserBubble,
+} from "@/components/chat/ChatSurface";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   APPLIANCE_LABEL,
   type ApplianceAnswer,
@@ -29,7 +27,7 @@ import { DEFAULT_HOUSEHOLD_ID } from "@/lib/demo-config";
 type HouseholdLite = { household_id: string; name: string; city: string };
 const HOUSEHOLDS = householdsRaw as HouseholdLite[];
 
-// Mock — in real app these come from the account.
+// Mock — in a real app these come from the account.
 const ACCOUNT_HAS_EV_CHARGER = true;
 
 type Msg =
@@ -72,7 +70,6 @@ const NOTIF_LABEL: Record<NotificationPref, string> = {
 
 type Step =
   | { kind: "welcome" }
-  | { kind: "household" }
   | { kind: "appliances" }
   | { kind: "smart"; idx: number }
   | { kind: "frequency"; idx: number }
@@ -83,37 +80,35 @@ type Step =
   | { kind: "notification" }
   | { kind: "done" };
 
-const TOTAL_DOTS = 8;
+const TOTAL_STEPS = 7;
 
 function stepProgress(step: Step): number {
   switch (step.kind) {
     case "welcome":
       return 0;
-    case "household":
-      return 1;
     case "appliances":
-      return 2;
+      return 1;
     case "smart":
     case "frequency":
-      return 3;
+      return 2;
     case "overnight":
-      return 4;
+      return 3;
     case "deadline_ask":
     case "deadline_pick":
-      return 5;
+      return 4;
     case "priority":
-      return 6;
+      return 5;
     case "notification":
-      return 7;
+      return 6;
     case "done":
-      return 8;
+      return 7;
   }
 }
 
 export function OnboardingChat({ onComplete }: { onComplete?: () => void } = {}) {
-  const navigate = useNavigate();
-  const [selectedHouseholdId, setSelectedHouseholdId] =
-    useState<string>(DEFAULT_HOUSEHOLD_ID);
+  const { user } = useAuth();
+  const selectedHouseholdId = user?.id ?? DEFAULT_HOUSEHOLD_ID;
+
   const [messages, setMessages] = useState<Msg[]>([]);
   const [step, setStep] = useState<Step>({ kind: "welcome" });
   const [typing, setTyping] = useState(false);
@@ -132,12 +127,10 @@ export function OnboardingChat({ onComplete }: { onComplete?: () => void } = {})
   const [priority, setPriority] = useState<Priority | undefined>();
   const [notif, setNotif] = useState<NotificationPref | undefined>();
 
-  // Multi-select local state for appliances step
+  // Multi-select draft for appliances step
   const [draftAppliances, setDraftAppliances] = useState<Set<ApplianceType | "none">>(new Set());
 
-  // ---- Rewind / undo system ----
-  // Each user reply pushes a Snapshot of the state RIGHT BEFORE that reply.
-  // Tap any user bubble (or the inline "Undo" link) to restore that snapshot.
+  // Undo / rewind
   type Snapshot = {
     step: Step;
     messages: Msg[];
@@ -152,9 +145,6 @@ export function OnboardingChat({ onComplete }: { onComplete?: () => void } = {})
     draftAppliances: Set<ApplianceType | "none">;
   };
   const [history, setHistory] = useState<Snapshot[]>([]);
-  // When we rewind, we want the assistant to re-ask the question. The step-watch
-  // effect only fires on step-reference changes — bump this nonce to force a re-ask
-  // when restoring to the same step kind.
   const [rewindNonce, setRewindNonce] = useState(0);
   const suppressInitialAskRef = useRef(false);
 
@@ -173,16 +163,14 @@ export function OnboardingChat({ onComplete }: { onComplete?: () => void } = {})
 
   const shouldAskDeadline = deadlineDevices.length > 0;
 
-  // Push assistant message with a brief typing indicator
   function ask(text: string) {
     setTyping(true);
     window.setTimeout(() => {
       setTyping(false);
       setMessages((m) => [...m, { id: crypto.randomUUID(), kind: "assistant", text }]);
-    }, 450);
+    }, 400);
   }
 
-  // Snapshot current state, then push the user reply tagged with that snapshot index.
   function reply(text: string) {
     const snap: Snapshot = {
       step,
@@ -216,31 +204,26 @@ export function OnboardingChat({ onComplete }: { onComplete?: () => void } = {})
     setPriority(snap.priority);
     setNotif(snap.notif);
     setDraftAppliances(new Set(snap.draftAppliances));
-    // Suppress the next step-watch ask (it already lives in snap.messages),
-    // then force a re-ask via rewindNonce so the user sees the question again.
     suppressInitialAskRef.current = true;
     setStep(snap.step);
     setRewindNonce((n) => n + 1);
   }
 
-  // Bootstrap welcome message
+  // Bootstrap
   useEffect(() => {
-    ask(
-      "Welcome to Enpal Pulse. A minute of setup so we can give you tips tailored to your home — not generic ones. You can skip anything.",
-    );
+    const greeting = user?.name
+      ? `Hi ${user.name} — welcome to Enpal Pulse. A minute of setup so we can tailor tips to your home. You can skip anything.`
+      : "Welcome to Enpal Pulse. A minute of setup so we can tailor tips to your home. You can skip anything.";
+    ask(greeting);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // When a step changes, push the appropriate assistant question.
-  // On rewind, the original question bubble is already restored via snap.messages,
-  // so we suppress the duplicate ask().
   useEffect(() => {
     if (suppressInitialAskRef.current) {
       suppressInitialAskRef.current = false;
       return;
     }
-    if (step.kind === "household") {
-      ask("Which home are we setting up?");
-    } else if (step.kind === "appliances") {
+    if (step.kind === "appliances") {
       ask("Which of these do you have at home?");
     } else if (step.kind === "smart") {
       const t = appliances[step.idx];
@@ -267,7 +250,6 @@ export function OnboardingChat({ onComplete }: { onComplete?: () => void } = {})
       ask(
         "Thanks — we'll start tailoring tips based on this. You can change these anytime in Settings.",
       );
-      // Persist
       const payload: OnboardingAnswers = {
         household_id: selectedHouseholdId,
         appliances: appliances.map<ApplianceAnswer>((type) => ({
@@ -289,7 +271,6 @@ export function OnboardingChat({ onComplete }: { onComplete?: () => void } = {})
   function advanceAfterAppliances(selected: ApplianceType[]) {
     setAppliances(selected);
     if (selected.length === 0) {
-      // "None of these" → skip appliance subflow
       setStep({ kind: "overnight" });
     } else {
       setStep({ kind: "smart", idx: 0 });
@@ -305,409 +286,325 @@ export function OnboardingChat({ onComplete }: { onComplete?: () => void } = {})
     }
   }
 
-  // ---------- Renderers ----------
+  // ---------- Controls renderers ----------
 
-  function WelcomeControls() {
-    return (
-      <PrimaryButton onClick={() => setStep({ kind: "household" })}>Let's go →</PrimaryButton>
-    );
-  }
-
-  function HouseholdControls() {
-    const pick = (id: string) => {
-      const h = HOUSEHOLDS.find((x) => x.household_id === id);
-      if (!h) return;
-      setSelectedHouseholdId(id);
-      reply(`${h.name} · ${h.city}`);
-      setStep({ kind: "appliances" });
-    };
-    return (
-      <div className="flex flex-wrap gap-2">
-        {HOUSEHOLDS.map((h) => (
-          <Chip
-            key={h.household_id}
-            selected={selectedHouseholdId === h.household_id}
-            onClick={() => pick(h.household_id)}
-          >
-            {h.name} · {h.city}
-          </Chip>
-        ))}
-      </div>
-    );
-  }
-
-  function AppliancesControls() {
-    const noneSelected = draftAppliances.has("none");
-    const realSelected = [...draftAppliances].filter((x) => x !== "none") as ApplianceType[];
-    const canContinue = noneSelected || realSelected.length > 0;
-
-    const toggle = (key: ApplianceType | "none") => {
-      const next = new Set(draftAppliances);
-      if (key === "none") {
-        if (next.has("none")) next.delete("none");
-        else {
-          next.clear();
-          next.add("none");
-        }
-      } else {
-        next.delete("none");
-        if (next.has(key)) next.delete(key);
-        else next.add(key);
-      }
-      setDraftAppliances(next);
-    };
-
-    return (
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap gap-2">
-          {APPLIANCE_OPTIONS.map((o) => (
-            <Chip
-              key={o.type}
-              selected={draftAppliances.has(o.type)}
-              onClick={() => toggle(o.type)}
-            >
-              {o.label}
-            </Chip>
-          ))}
-          <Chip selected={noneSelected} onClick={() => toggle("none")}>
-            None of these
-          </Chip>
-        </div>
-        {canContinue && (
-          <PrimaryButton
-            onClick={() => {
-              const label = noneSelected
-                ? "None of these"
-                : realSelected.map((t) => APPLIANCE_LABEL[t]).join(", ");
-              reply(label);
-              advanceAfterAppliances(noneSelected ? [] : realSelected);
-            }}
-          >
-            Continue →
-          </PrimaryButton>
-        )}
-      </div>
-    );
-  }
-
-  function SmartControls({ idx }: { idx: number }) {
-    const t = appliances[idx];
-    if (!t) return null;
-    const choose = (val: SmartState) => {
-      setSmartByAppliance((p) => ({ ...p, [t]: val }));
-      reply(SMART_LABEL[val]);
-      setStep({ kind: "frequency", idx });
-    };
-    return (
-      <div className="flex flex-wrap gap-2">
-        {(["smart", "regular", "not_sure"] as SmartState[]).map((v) => (
-          <Chip key={v} onClick={() => choose(v)}>
-            {SMART_LABEL[v]}
-          </Chip>
-        ))}
-      </div>
-    );
-  }
-
-  function FrequencyControls({ idx }: { idx: number }) {
-    const t = appliances[idx];
-    if (!t) return null;
-    const choose = (val: Frequency) => {
-      setFreqByAppliance((p) => ({ ...p, [t]: val }));
-      reply(FREQ_LABEL[val]);
-      nextPerApplianceAfterFreq(idx);
-    };
-    return (
-      <div className="flex flex-wrap gap-2">
-        {(["daily", "few_times_week", "rarely"] as Frequency[]).map((v) => (
-          <Chip key={v} onClick={() => choose(v)}>
-            {FREQ_LABEL[v]}
-          </Chip>
-        ))}
-      </div>
-    );
-  }
-
-  function OvernightControls() {
-    const choose = (val: OvernightPref) => {
-      setOvernight(val);
-      reply(OVERNIGHT_LABEL[val]);
-      setStep(shouldAskDeadline ? { kind: "deadline_ask" } : { kind: "priority" });
-    };
-    return (
-      <div className="flex flex-wrap gap-2">
-        {(["anytime", "only_while_home", "not_overnight"] as OvernightPref[]).map((v) => (
-          <Chip key={v} onClick={() => choose(v)}>
-            {OVERNIGHT_LABEL[v]}
-          </Chip>
-        ))}
-      </div>
-    );
-  }
-
-  function DeadlineAskControls() {
-    return (
-      <div className="flex flex-wrap gap-2">
-        <Chip
-          onClick={() => {
-            setHasDeadline(true);
-            reply("Yes");
-            setStep({ kind: "deadline_pick" });
-          }}
-        >
-          Yes
-        </Chip>
-        <Chip
-          onClick={() => {
-            setHasDeadline(false);
-            reply("No, no fixed deadline");
-            setStep({ kind: "priority" });
-          }}
-        >
-          No, no fixed deadline
-        </Chip>
-      </div>
-    );
-  }
-
-  function DeadlinePickControls() {
-    const labelFor = (d: ApplianceType | "ev_charger") =>
-      d === "ev_charger" ? "EV charger" : APPLIANCE_LABEL[d];
-    const setTime = (d: ApplianceType | "ev_charger", time: string) => {
-      setDeadlines((prev) => {
-        const others = prev.filter((x) => x.type !== d);
-        return time ? [...others, { type: d, time }] : others;
-      });
-    };
-    const current = (d: ApplianceType | "ev_charger") =>
-      deadlines.find((x) => x.type === d)?.time ?? "";
-
-    return (
-      <div className="flex flex-col gap-3 rounded-[14px] border border-[color:var(--border)] bg-white p-4">
-        {deadlineDevices.map((d) => (
-          <label key={d} className="flex items-center justify-between gap-3">
-            <span className="text-[15px] font-medium text-[var(--brand-navy)]">{labelFor(d)}</span>
-            <input
-              type="time"
-              value={current(d)}
-              onChange={(e) => setTime(d, e.target.value)}
-              className="min-h-[44px] rounded-[14px] border border-[color:var(--border)] px-3 py-2 text-[16px] font-semibold text-[var(--brand-navy)] focus:border-[var(--brand-navy)] focus:outline-none"
-              style={{ borderRadius: 14 }}
-            />
-          </label>
-        ))}
-        <PrimaryButton
-          onClick={() => {
-            if (deadlines.length > 0) {
-              reply(
-                deadlines
-                  .map(
-                    (d) =>
-                      `${d.type === "ev_charger" ? "EV" : APPLIANCE_LABEL[d.type as ApplianceType]} by ${d.time}`,
-                  )
-                  .join(" · "),
-              );
-            } else {
-              reply("No times set");
-            }
-            setStep({ kind: "priority" });
-          }}
-        >
-          Continue →
-        </PrimaryButton>
-      </div>
-    );
-  }
-
-  function PriorityControls() {
-    const choose = (val: Priority) => {
-      setPriority(val);
-      reply(PRIORITY_LABEL[val]);
-      setStep({ kind: "notification" });
-    };
-    return (
-      <div className="flex flex-wrap gap-2">
-        {(["save_money", "reduce_co2", "both_equally"] as Priority[]).map((v) => (
-          <Chip key={v} onClick={() => choose(v)}>
-            {PRIORITY_LABEL[v]}
-          </Chip>
-        ))}
-      </div>
-    );
-  }
-
-  function NotificationControls() {
-    const automaticDisabled = !hasAnySmart;
-    const choose = (val: NotificationPref) => {
-      setNotif(val);
-      reply(NOTIF_LABEL[val]);
-      setStep({ kind: "done" });
-    };
-    return (
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap gap-2">
-          <Chip onClick={() => choose("notify_me")}>{NOTIF_LABEL.notify_me}</Chip>
-          <Chip
-            disabled={automaticDisabled}
-            onClick={() => !automaticDisabled && choose("automatic")}
-          >
-            {NOTIF_LABEL.automatic}
-          </Chip>
-          <Chip onClick={() => choose("check_app")}>{NOTIF_LABEL.check_app}</Chip>
-        </div>
-        {automaticDisabled && (
-          <p className="text-[13px] font-medium text-[var(--brand-stone)]">
-            Automatic scheduling needs a smart/connected device — you can still get notifications.
-          </p>
-        )}
-      </div>
-    );
-  }
-
-  function DoneControls() {
-    return (
-      <PrimaryButton
-        onClick={() => {
-          if (onComplete) onComplete();
-          else navigate({ to: "/" });
-        }}
-      >
-        Go to my dashboard →
-      </PrimaryButton>
-    );
-  }
-
-  // Generic skip behavior per step
-  function skip() {
+  function renderControls() {
+    if (typing) return null;
     switch (step.kind) {
       case "welcome":
-        setStep({ kind: "household" });
-        break;
-      case "household":
-        reply("Skipped");
-        setStep({ kind: "appliances" });
-        break;
-      case "appliances":
-        reply("Skipped");
-        advanceAfterAppliances([]);
-        break;
+        return (
+          <div>
+            <button
+              type="button"
+              onClick={() => setStep({ kind: "appliances" })}
+              className="btn-cta"
+            >
+              Let's go →
+            </button>
+          </div>
+        );
+      case "appliances": {
+        const noneSelected = draftAppliances.has("none");
+        const realSelected = [...draftAppliances].filter((x) => x !== "none") as ApplianceType[];
+        const canContinue = noneSelected || realSelected.length > 0;
+        const toggle = (key: ApplianceType | "none") => {
+          const next = new Set(draftAppliances);
+          if (key === "none") {
+            if (next.has("none")) next.delete("none");
+            else {
+              next.clear();
+              next.add("none");
+            }
+          } else {
+            next.delete("none");
+            if (next.has(key)) next.delete(key);
+            else next.add(key);
+          }
+          setDraftAppliances(next);
+        };
+        return (
+          <div className="space-y-3">
+            <div className="grid sm:grid-cols-2 gap-2.5">
+              {APPLIANCE_OPTIONS.map((o) => (
+                <ChoiceChip
+                  key={o.type}
+                  selected={draftAppliances.has(o.type)}
+                  onClick={() => toggle(o.type)}
+                >
+                  {o.label}
+                </ChoiceChip>
+              ))}
+              <ChoiceChip selected={noneSelected} onClick={() => toggle("none")}>
+                None of these
+              </ChoiceChip>
+            </div>
+            {canContinue && (
+              <button
+                type="button"
+                className="btn-cta"
+                onClick={() => {
+                  const label = noneSelected
+                    ? "None of these"
+                    : realSelected.map((t) => APPLIANCE_LABEL[t]).join(", ");
+                  reply(label);
+                  advanceAfterAppliances(noneSelected ? [] : realSelected);
+                }}
+              >
+                Continue →
+              </button>
+            )}
+          </div>
+        );
+      }
       case "smart": {
         const t = appliances[step.idx];
-        if (t) setSmartByAppliance((p) => ({ ...p, [t]: "not_sure" }));
-        reply("Skipped");
-        setStep({ kind: "frequency", idx: step.idx });
-        break;
+        if (!t) return null;
+        const choose = (val: SmartState) => {
+          setSmartByAppliance((p) => ({ ...p, [t]: val }));
+          reply(SMART_LABEL[val]);
+          setStep({ kind: "frequency", idx: step.idx });
+        };
+        return (
+          <div className="grid sm:grid-cols-3 gap-2.5">
+            {(["smart", "regular", "not_sure"] as SmartState[]).map((v) => (
+              <ChoiceChip key={v} onClick={() => choose(v)}>
+                {SMART_LABEL[v]}
+              </ChoiceChip>
+            ))}
+          </div>
+        );
       }
       case "frequency": {
         const t = appliances[step.idx];
-        if (t) setFreqByAppliance((p) => ({ ...p, [t]: "rarely" }));
-        reply("Skipped");
-        nextPerApplianceAfterFreq(step.idx);
-        break;
+        if (!t) return null;
+        const choose = (val: Frequency) => {
+          setFreqByAppliance((p) => ({ ...p, [t]: val }));
+          reply(FREQ_LABEL[val]);
+          nextPerApplianceAfterFreq(step.idx);
+        };
+        return (
+          <div className="grid sm:grid-cols-3 gap-2.5">
+            {(["daily", "few_times_week", "rarely"] as Frequency[]).map((v) => (
+              <ChoiceChip key={v} onClick={() => choose(v)}>
+                {FREQ_LABEL[v]}
+              </ChoiceChip>
+            ))}
+          </div>
+        );
       }
-      case "overnight":
-        reply("Skipped");
-        setStep(shouldAskDeadline ? { kind: "deadline_ask" } : { kind: "priority" });
-        break;
+      case "overnight": {
+        const choose = (val: OvernightPref) => {
+          setOvernight(val);
+          reply(OVERNIGHT_LABEL[val]);
+          setStep(shouldAskDeadline ? { kind: "deadline_ask" } : { kind: "priority" });
+        };
+        return (
+          <div className="grid sm:grid-cols-3 gap-2.5">
+            {(["anytime", "only_while_home", "not_overnight"] as OvernightPref[]).map((v) => (
+              <ChoiceChip key={v} onClick={() => choose(v)}>
+                {OVERNIGHT_LABEL[v]}
+              </ChoiceChip>
+            ))}
+          </div>
+        );
+      }
       case "deadline_ask":
-      case "deadline_pick":
-        reply("Skipped");
-        setStep({ kind: "priority" });
-        break;
-      case "priority":
-        reply("Skipped");
-        setStep({ kind: "notification" });
-        break;
-      case "notification":
-        reply("Skipped");
-        setStep({ kind: "done" });
-        break;
+        return (
+          <div className="grid sm:grid-cols-2 gap-2.5">
+            <ChoiceChip
+              onClick={() => {
+                setHasDeadline(true);
+                reply("Yes");
+                setStep({ kind: "deadline_pick" });
+              }}
+            >
+              Yes
+            </ChoiceChip>
+            <ChoiceChip
+              onClick={() => {
+                setHasDeadline(false);
+                reply("No, no fixed deadline");
+                setStep({ kind: "priority" });
+              }}
+            >
+              No, no fixed deadline
+            </ChoiceChip>
+          </div>
+        );
+      case "deadline_pick": {
+        const labelFor = (d: ApplianceType | "ev_charger") =>
+          d === "ev_charger" ? "EV charger" : APPLIANCE_LABEL[d];
+        const setTime = (d: ApplianceType | "ev_charger", time: string) => {
+          setDeadlines((prev) => {
+            const others = prev.filter((x) => x.type !== d);
+            return time ? [...others, { type: d, time }] : others;
+          });
+        };
+        const current = (d: ApplianceType | "ev_charger") =>
+          deadlines.find((x) => x.type === d)?.time ?? "";
+        return (
+          <div className="space-y-3">
+            <div className="rounded-2xl bg-cta/10 p-4 space-y-3">
+              {deadlineDevices.map((d) => (
+                <label key={d} className="flex items-center justify-between gap-3">
+                  <span className="text-[15px] font-medium text-navy">{labelFor(d)}</span>
+                  <input
+                    type="time"
+                    value={current(d)}
+                    onChange={(e) => setTime(d, e.target.value)}
+                    className="min-h-[44px] rounded-xl border border-border bg-white px-3 py-2 text-[15px] font-semibold text-navy focus:border-navy focus:outline-none"
+                  />
+                </label>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="btn-cta"
+              onClick={() => {
+                if (deadlines.length > 0) {
+                  reply(
+                    deadlines
+                      .map(
+                        (d) =>
+                          `${d.type === "ev_charger" ? "EV" : APPLIANCE_LABEL[d.type as ApplianceType]} by ${d.time}`,
+                      )
+                      .join(" · "),
+                  );
+                } else {
+                  reply("No times set");
+                }
+                setStep({ kind: "priority" });
+              }}
+            >
+              Continue →
+            </button>
+          </div>
+        );
+      }
+      case "priority": {
+        const choose = (val: Priority) => {
+          setPriority(val);
+          reply(PRIORITY_LABEL[val]);
+          setStep({ kind: "notification" });
+        };
+        return (
+          <div className="grid sm:grid-cols-3 gap-2.5">
+            {(["save_money", "reduce_co2", "both_equally"] as Priority[]).map((v) => (
+              <ChoiceChip key={v} onClick={() => choose(v)}>
+                {PRIORITY_LABEL[v]}
+              </ChoiceChip>
+            ))}
+          </div>
+        );
+      }
+      case "notification": {
+        const automaticDisabled = !hasAnySmart;
+        const choose = (val: NotificationPref) => {
+          setNotif(val);
+          reply(NOTIF_LABEL[val]);
+          setStep({ kind: "done" });
+        };
+        return (
+          <div className="space-y-2">
+            <div className="grid sm:grid-cols-3 gap-2.5">
+              <ChoiceChip onClick={() => choose("notify_me")}>{NOTIF_LABEL.notify_me}</ChoiceChip>
+              <ChoiceChip
+                disabled={automaticDisabled}
+                onClick={() => !automaticDisabled && choose("automatic")}
+              >
+                {NOTIF_LABEL.automatic}
+              </ChoiceChip>
+              <ChoiceChip onClick={() => choose("check_app")}>{NOTIF_LABEL.check_app}</ChoiceChip>
+            </div>
+            {automaticDisabled && (
+              <p className="text-[13px] text-stone">
+                Automatic scheduling needs a smart device — you can still get notifications.
+              </p>
+            )}
+          </div>
+        );
+      }
       case "done":
-        if (onComplete) onComplete();
-        else navigate({ to: "/" });
-        break;
+        return (
+          <button
+            type="button"
+            className="btn-cta"
+            onClick={() => onComplete?.()}
+          >
+            Open my dashboard →
+          </button>
+        );
     }
   }
 
-  const showSkip = step.kind !== "welcome" && step.kind !== "done";
+  // Last user message index — for inline undo affordance
+  let lastUserIdx = -1;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].kind === "user") {
+      lastUserIdx = i;
+      break;
+    }
+  }
+
+  const messagesNode = (
+    <>
+      {messages.map((m, i) => {
+        if (m.kind === "assistant") {
+          return <AssistantBubble key={m.id}>{m.text}</AssistantBubble>;
+        }
+        const canEdit = typeof m.snapshotIndex === "number";
+        const isLastUser = i === lastUserIdx;
+        return (
+          <div key={m.id} className="space-y-1">
+            <UserBubble
+              onClick={canEdit ? () => rewindTo(m.snapshotIndex!) : undefined}
+              title={canEdit ? "Tap to change this answer" : undefined}
+            >
+              {m.text}
+            </UserBubble>
+            {isLastUser && canEdit && !typing && (
+              <div className="flex justify-end pr-1">
+                <button
+                  type="button"
+                  onClick={() => rewindTo(m.snapshotIndex!)}
+                  className="text-[12px] font-semibold text-stone hover:text-navy underline-offset-4 hover:underline"
+                >
+                  Undo
+                </button>
+              </div>
+            )}
+          </div>
+        );
+      })}
+      {typing && (
+        <AssistantBubble>
+          <span className="inline-flex gap-1 items-center text-stone">
+            <span className="h-1.5 w-1.5 rounded-full bg-stone/60 animate-pulse" />
+            <span className="h-1.5 w-1.5 rounded-full bg-stone/60 animate-pulse [animation-delay:120ms]" />
+            <span className="h-1.5 w-1.5 rounded-full bg-stone/60 animate-pulse [animation-delay:240ms]" />
+          </span>
+        </AssistantBubble>
+      )}
+    </>
+  );
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      {/* Top bar — matches AppShell branding */}
-      <header className="sticky top-0 z-10 bg-navy text-white">
-        <div className="mx-auto flex w-full max-w-[560px] items-center justify-between gap-4 px-5 py-4">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-cta">
-              <span className="font-display text-lg text-navy">E</span>
-            </div>
-            <div className="leading-tight">
-              <div className="font-display text-base text-white">Enpal Pulse</div>
-              <div className="-mt-0.5 text-[11px] text-white/60">Quick setup</div>
-            </div>
-          </div>
-          <div className="flex-1 px-4">
-            <ProgressDots total={TOTAL_DOTS} current={stepProgress(step)} />
-          </div>
-          <div className="w-12 text-right">{showSkip && <SkipLink onClick={skip} />}</div>
-        </div>
-      </header>
-
-      {/* Chat thread */}
-      <main className="mx-auto flex w-full max-w-[560px] flex-1 flex-col gap-4 px-5 py-6">
-        <ChatScroller>
-          {(() => {
-            // Find the most recent user message that can be undone.
-            let lastUserIdx = -1;
-            for (let i = messages.length - 1; i >= 0; i--) {
-              if (messages[i].kind === "user") {
-                lastUserIdx = i;
-                break;
-              }
-            }
-            return messages.map((m, i) => {
-              if (m.kind === "assistant") {
-                return (
-                  <ChatBubble key={m.id} role="assistant">
-                    {m.text}
-                  </ChatBubble>
-                );
-              }
-              const canEdit = typeof m.snapshotIndex === "number";
-              const isLastUser = i === lastUserIdx;
-              return (
-                <div key={m.id} className="flex flex-col gap-1">
-                  <ChatBubble
-                    role="user"
-                    onEdit={canEdit ? () => rewindTo(m.snapshotIndex!) : undefined}
-                  >
-                    {m.text}
-                  </ChatBubble>
-                  {isLastUser && canEdit && !typing && (
-                    <UndoLink onClick={() => rewindTo(m.snapshotIndex!)} />
-                  )}
-                </div>
-              );
-            });
-          })()}
-          {typing && <TypingBubble />}
-        </ChatScroller>
-
-        {!typing && (
-          <div className="pulse-enter mt-2">
-            {step.kind === "welcome" && <WelcomeControls />}
-            {step.kind === "household" && <HouseholdControls />}
-            {step.kind === "appliances" && <AppliancesControls />}
-            {step.kind === "smart" && <SmartControls idx={step.idx} />}
-            {step.kind === "frequency" && <FrequencyControls idx={step.idx} />}
-            {step.kind === "overnight" && <OvernightControls />}
-            {step.kind === "deadline_ask" && <DeadlineAskControls />}
-            {step.kind === "deadline_pick" && <DeadlinePickControls />}
-            {step.kind === "priority" && <PriorityControls />}
-            {step.kind === "notification" && <NotificationControls />}
-            {step.kind === "done" && <DoneControls />}
-          </div>
-        )}
-      </main>
-    </div>
+    <ChatSurface
+      title="Welcome to Enpal Pulse"
+      subtitle="A minute of setup so we can tailor tips to your home."
+      meta={`Step ${stepProgress(step)} of ${TOTAL_STEPS}`}
+      messages={messagesNode}
+      controls={renderControls()}
+      scrollKey={messages.length + (typing ? 1 : 0) + step.kind}
+      composer={
+        <Composer
+          value=""
+          onChange={() => {}}
+          onSubmit={() => {}}
+          disabled
+          placeholder="Tap an option above to continue…"
+        />
+      }
+    />
   );
 }
