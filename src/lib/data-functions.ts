@@ -3,6 +3,7 @@ import { getRequestUrl } from "@tanstack/react-start/server";
 import { z } from "zod";
 
 import {
+  buildComparisonView,
   buildLast30Days,
   buildTodayView,
   buildWeeklyView,
@@ -12,8 +13,16 @@ import {
   getMonthlyBillsView,
 } from "./aggregations.server";
 import { listHouseholds } from "./data-loader.server";
+import { DEMO_NOW_HOUR, DEMO_TODAY } from "./demo-config";
 
 const householdInput = z.object({ householdId: z.string() });
+
+const homeInput = z.object({
+  householdId: z.string(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).default(DEMO_TODAY),
+  hour: z.number().int().min(0).max(23).default(DEMO_NOW_HOUR),
+  cmp: z.enum(["1w", "1mo", "1y"]).default("1w"),
+});
 
 function origin() {
   return getRequestUrl().origin;
@@ -33,6 +42,18 @@ export const getHouseholdSummaryFn = createServerFn({ method: "POST" })
       Promise.resolve(getInsightsView(data.householdId)),
     ]);
     return { ...view, today, bills, insights };
+  });
+
+export const getHomeComparisonFn = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => homeInput.parse(input))
+  .handler(async ({ data }) => {
+    const [view, comparison, bills, insights] = await Promise.all([
+      Promise.resolve(getHouseholdView(data.householdId)),
+      buildComparisonView(data.householdId, origin(), data.date, data.hour, data.cmp),
+      Promise.resolve(getMonthlyBillsView(data.householdId)),
+      Promise.resolve(getInsightsView(data.householdId)),
+    ]);
+    return { ...view, comparison, bills, insights };
   });
 
 export const getWeeklyViewFn = createServerFn({ method: "POST" })
