@@ -1,99 +1,98 @@
-## Goal
+# Rethink the dashboard — minimal Home, energy-infra "My Home", focused Insights
 
-Three connected problems to fix on `/`:
+## 0. Naming
 
-1. **Sign out is broken** — clicking it clears localStorage and navigates to `/`, but we're already on `/`, so `HomeGate`'s mount-only `useEffect` never re-runs and the dashboard keeps rendering.
-2. **No login step** — onboarding fires immediately for a "signed out" user. The user wants a tiny dummy sign-in screen first, then onboarding, then dashboard.
-3. **Onboarding feels like a different product than the in-app chat** — different bubbles, different chrome, different composer. It should reuse the same chat surface as `/chat` so users don't perceive two apps stitched together.
+`/settings` stays as the **editable setup form** (preferences, deadlines, appliances) — reachable from the avatar menu.
 
-## New auth + gate flow on `/`
+The new descriptive page about the house's energy infrastructure needs a name distinct from "Profile" (which sounds like a user account). Suggestions, in order of preference:
 
-Three states, evaluated reactively (not just on mount):
+1. **My Home** — friendly, matches the product voice ("Enpal Pulse — your home energy").
+2. **System** — accurate (PV + battery + heat pump + tariff = the energy system), short.
+3. **House** — minimal, but slightly ambiguous.
+4. **Energy setup** — descriptive but collides with the word "setup" used for `/settings`.
 
-```
-signed out          →  <SignIn />            (new dummy login screen)
-signed in, no setup →  <OnboardingChat />    (rebuilt on the chat surface)
-signed in, set up   →  <HomePage />          (current dashboard)
-```
+Plan below uses **My Home** at route `/home-details` (URL kept neutral so we can rename the label without a route migration). Tell me if you prefer one of the others and I'll swap the label.
 
-Storage keys:
-- `enpal_pulse_user` — `{ id: string, name: string }`. Presence = signed in.
-- `enpal_pulse_onboarding` — existing onboarding record. Presence = setup complete.
+## 1. Anchor the demo to Dec 31, 2025
 
-Reactive gate (fixes sign-out):
-- Lift the gate into a small `AuthContext` in `src/routes/__root.tsx` exposing `{ user, onboarding, signIn, signOut, refresh }`.
-- `signOut()` clears both keys and updates context state → `HomeGate` immediately re-renders into `<SignIn />` without needing a navigation or remount.
-- `signIn(user)` sets `enpal_pulse_user` and updates context → gate flips to onboarding.
-- `OnboardingChat.onComplete` writes onboarding + calls `refresh()` → gate flips to dashboard.
-- Also wire a `window` `storage` listener so sign-out from another tab works too.
+Change `src/lib/demo-config.ts`:
 
-## 1. Dummy sign-in screen
+- `DEMO_TODAY = "2025-12-31"` — full 12 months of bills, winter "now".
+- `DEMO_NOW_HOUR = 18` — dark, heating active, EV charging.
 
-New file: `src/components/auth/SignIn.tsx`.
+Everything reads from this constant, so the whole app time-travels in one edit. The calendar in `HomeHeader` still lets the user move within the dataset range.
 
-- Full-screen, same navy header band as `AppShell` (Enpal Pulse wordmark only — no nav, no account chip).
-- Below: a centered card titled "Sign in to Enpal Pulse" with a short subtitle ("Demo — pick a household to continue").
-- Lists the demo households from `src/data/raw/households.json` as buttons (`Familie Becker · Berlin`, etc.). Clicking one calls `signIn({ id: household_id, name })`.
-- Visually consistent with the dashboard: `card-soft`, `btn-cta`, navy/cta tokens. No new design language.
+## 2. New IA
 
-This replaces the prior behavior where landing on `/` dropped you straight into onboarding.
+| Tab | Purpose |
+|---|---|
+| Home | Minimal live snapshot of the home right now |
+| My Home | Descriptive view of the energy infrastructure: assets, contract, tariff, yearly totals, bills |
+| Insights | Recommendations + anomalies to act on |
+| Chat | (unchanged) |
 
-## 2. Sign-out fix
+Avatar menu keeps **Edit setup → `/settings`** and **Sign out**.
 
-In `AppShell`:
-- Replace the current `signOut` (which only clears the onboarding key + navigates) with a call to `useAuth().signOut()`.
-- `useAuth().signOut()` clears both `enpal_pulse_user` and `enpal_pulse_onboarding`, then sets context state → `HomeGate` instantly renders `<SignIn />`.
-- Also navigate to `/` (no-op if already there) so signing out from `/chat`, `/settings`, etc. lands on the sign-in screen.
+Nav order in `AppShell.NAV`: Home · My Home · Insights · Chat. Mobile bottom-nav grid grows from 3 to 4.
 
-## 3. Unify the onboarding chat with the in-app chat
+## 3. Home — minimalistic
 
-The visual shell must match `/chat`. Refactor `OnboardingChat` so it renders inside the same chat layout, with the same bubbles, the same suggestion-chip styling, the same composer placement, and the same `AppShell`-style page header.
+Three blocks, no chip grid:
 
-### Shared chat shell
+1. **Greeting**: "Good evening, {name}" + small line "Wed, 31 Dec 2025 · {city}".
+2. **Live state hero** — `EnergyFlow` in a new `compact` mode:
+   - Headline ("Running on your battery" / "Importing from grid") + current grid price.
+   - House-load bar.
+   - 3 tiles only: Solar, Battery, Grid.
+   - Hide heat-pump + EV tiles and the baseline footer.
+3. **One-line today summary**: `Today: 4.2 kWh solar · 18.6 kWh used · 41% self-sufficient · €5.20 so far`.
+4. **Single CTA**: "Ask Pulse →" → `/chat`.
 
-Extract the common chrome from `src/routes/chat.tsx` into a small reusable component: `src/components/chat/ChatSurface.tsx`.
+Remove from Home: `ComparisonStrip`, 8-chip section, featured insight card, 3-card action grid. Comparison + insights live in `/insights`; assets/contract/bills live in `/home-details`.
 
-Exports:
-- `<ChatSurface header={…}>{children}</ChatSurface>` — wraps `AppShell` + the "Ask Enpal Pulse" title block + the scrollable `card-soft` message area + the bottom composer slot.
-- `<AssistantBubble>` and `<UserBubble>` — the exact bubble styles from `/chat`'s `MessageBubble` (assistant: `bg-secondary/70 text-navy rounded-bl-md`, user: `bg-navy text-white rounded-br-md`). Used by both `/chat` and onboarding.
-- `<ChoiceChip>` — the same yellow suggestion-chip style currently used for `/chat`'s "Try one of these" (`bg-cta/20 hover:bg-cta/40 rounded-2xl`). Onboarding answer chips use this instead of the bespoke `Chip` from `chat-primitives.tsx`.
-- `<Composer disabled placeholder onSubmit />` — the textarea + arrow button block.
+## 4. My Home — `/home-details`
 
-Refactor `/chat`'s `ChatPage` to render through `ChatSurface` (no behavior change, just consume the shared shell so it stays in sync).
+New route `src/routes/home-details.tsx`. New combined server fn `getMyHomeFn` returning `{ household, tariff, contract, bills, last30, yearTotals }`.
 
-### Onboarding rendered through `ChatSurface`
+Sections, top to bottom:
 
-Rewrite `OnboardingChat.tsx` to:
-- Wrap content in `<ChatSurface header={{ title: "Welcome to Enpal Pulse", subtitle: "A minute of setup so we can tailor tips to your home." }}>`. (Title varies by step is optional — keep one for simplicity.)
-- Inside the message area, render the scripted assistant/user turns as `<AssistantBubble>` / `<UserBubble>` — same look as `/chat`.
-- Below the latest assistant message, render the active step's input as `<ChoiceChip>` rows (households, appliances, smart/freq, overnight, deadline, priority, notification) instead of the current `Chip` primitive.
-- Disable the bottom composer (`disabled placeholder="Tap an option above to continue…"`) so the composer is visible (same placement as `/chat`) but the user is guided through chips. This keeps the page structure identical to in-app chat — same composer footprint, same scroll behavior, same bubble grammar.
-- Show step progress as a thin one-line `text-stone text-xs` "Step 3 of 8" under the subtitle, replacing the bespoke `ProgressDots`.
-- Keep the existing answer logic, snapshot/undo system, and `saveOnboarding(...)` + `onComplete()` call at the end — only the presentation layer changes.
-- On the final "done" step, swap the chips for a single `btn-cta` "Open my dashboard →" that calls `onComplete?.()`.
+1. **Household**: name, city, residents.
+2. **Energy assets** (icon tiles from `contract.assets`): PV kWp, battery kWh + power kW, heat pump kW (if present), EV charger + EV battery kWh.
+3. **Tariff & contract**:
+   - Tariff name + model (dynamic/fixed), current effective rate, base fee, feed-in rate.
+   - Contract start/end with a **term-progress bar** (start → end, today marker).
+   - **Next notice deadline** (end − notice period weeks).
+   - Minimum term, auto-renew window.
+4. **2025 in numbers** (from `monthly_bills.json`, summed): total kWh consumed, produced, self-sufficiency avg, grid import/export kWh, total spend €, total feed-in credit €.
+5. **Monthly bills chart**: 12 bars of `total_bill_eur` with `pv_production_kwh` overlay, plus a compact table.
+6. **Last 30 days**: sparkline of daily energy cost from `buildLast30Days`.
+7. **Edit setup** button → `/settings`.
 
-Delete or shrink `src/components/onboarding/chat-primitives.tsx` (its `ChatBubble`/`Chip`/`TypingBubble`/`ChatScroller`/`PrimaryButton` are superseded by `ChatSurface` exports). Keep only what `OnboardingChat` still imports, or remove the file if nothing remains.
+Read-only page; nothing here writes back.
 
-### Result
+## 5. Insights — recommendations focus
 
-- Same navy `AppShell` header on sign-in, onboarding, dashboard, chat, settings.
-- Same chat bubble visuals + composer in onboarding and in `/chat` — onboarding just drives the conversation with tappable chips and a disabled composer.
+Rewrite `src/routes/insights.tsx`:
 
-## Files
+1. **Recommendations** lead: all entries from `insight_events.json` for the household, grouped High → Info. Each card: type · period · title · detail · "Ask about this" → `/chat?q=…`.
+2. **Compact weekly strip** below: 7-day cost bars + "saved this week" number as one secondary card.
+3. Drop the duplicate "Recent insights" tail and the footer line.
 
-- New: `src/contexts/AuthContext.tsx` (provider + `useAuth`).
-- New: `src/components/auth/SignIn.tsx`.
-- New: `src/components/chat/ChatSurface.tsx` (shell + bubbles + chip + composer).
-- Edit: `src/routes/__root.tsx` — wrap `<Outlet />` in `<AuthProvider>`.
-- Edit: `src/routes/index.tsx` — `HomeGate` reads `useAuth()`; renders `SignIn` / `OnboardingChat` / `HomePage`.
-- Edit: `src/components/AppShell.tsx` — `signOut` calls `useAuth().signOut()`.
-- Edit: `src/routes/chat.tsx` — use `ChatSurface` + shared bubbles/chips.
-- Edit: `src/components/onboarding/OnboardingChat.tsx` — render through `ChatSurface`, use shared bubbles/chips, drop bespoke chrome.
-- Edit/remove: `src/components/onboarding/chat-primitives.tsx`.
+## 6. Files touched
+
+- `src/lib/demo-config.ts` — date + hour.
+- `src/components/AppShell.tsx` — NAV + mobile bottom-nav.
+- `src/routes/index.tsx` — strip Home down.
+- `src/components/EnergyFlow.tsx` — add `compact` prop.
+- `src/routes/home-details.tsx` — new.
+- `src/lib/data-functions.ts` — add `getMyHomeFn`.
+- `src/lib/aggregations.server.ts` — add `summarizeYear(bills)` helper.
+- `src/routes/insights.tsx` — recommendations-first.
+
+`src/routeTree.gen.ts` regenerates automatically.
 
 ## Out of scope
 
-- Real auth (still localStorage-only, dummy users from `households.json`).
-- Changing the onboarding script or questions.
-- Restyling `/chat`, `/settings`, `/insights`.
-- Persisting per-user onboarding (still a single record).
+- No onboarding, chat, settings-form, or auth changes.
+- No new data files.
+- No design-token changes.

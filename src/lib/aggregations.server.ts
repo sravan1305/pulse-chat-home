@@ -375,3 +375,39 @@ export function getHouseholdView(householdId: string) {
   const tariff = getTariff(hh.tariff_id);
   return { household: hh, tariff };
 }
+
+export type YearTotals = {
+  year: string;
+  months_counted: number;
+  consumption_kwh: number;
+  pv_production_kwh: number;
+  grid_import_kwh: number;
+  grid_export_kwh: number;
+  energy_cost_eur: number;
+  base_fee_eur: number;
+  feed_in_credit_eur: number;
+  total_bill_eur: number;
+  self_sufficiency_pct: number;
+};
+
+export function summarizeYear(bills: MonthlyBill[], year: string): YearTotals {
+  const inYear = bills.filter((b) => b.month.startsWith(year));
+  const sum = (key: keyof MonthlyBill) =>
+    inYear.reduce((acc, b) => acc + (typeof b[key] === "number" ? (b[key] as number) : 0), 0);
+  const cons = sum("consumption_kwh");
+  const gi = sum("grid_import_kwh");
+  return {
+    year,
+    months_counted: inYear.length,
+    consumption_kwh: round(cons, 1),
+    pv_production_kwh: round(sum("pv_production_kwh"), 1),
+    grid_import_kwh: round(gi, 1),
+    grid_export_kwh: round(sum("grid_export_kwh"), 1),
+    energy_cost_eur: round(sum("energy_cost_eur"), 2),
+    base_fee_eur: round(sum("base_fee_eur"), 2),
+    feed_in_credit_eur: round(sum("feed_in_credit_eur"), 2),
+    total_bill_eur: round(sum("total_bill_eur"), 2),
+    self_sufficiency_pct: cons > 0 ? round(((cons - gi) / cons) * 100, 1) : 0,
+  };
+}
+

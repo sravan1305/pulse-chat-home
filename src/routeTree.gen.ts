@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as MyHomeRouteImport } from './routes/my-home'
 import { Route as InsightsRouteImport } from './routes/insights'
 import { Route as ChatRouteImport } from './routes/chat'
 import { Route as IndexRouteImport } from './routes/index'
@@ -18,6 +19,11 @@ import { Route as ApiChatRouteImport } from './routes/api/chat'
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MyHomeRoute = MyHomeRouteImport.update({
+  id: '/my-home',
+  path: '/my-home',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InsightsRoute = InsightsRouteImport.update({
@@ -45,6 +51,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/chat': typeof ChatRoute
   '/insights': typeof InsightsRoute
+  '/my-home': typeof MyHomeRoute
   '/settings': typeof SettingsRoute
   '/api/chat': typeof ApiChatRoute
 }
@@ -52,6 +59,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/chat': typeof ChatRoute
   '/insights': typeof InsightsRoute
+  '/my-home': typeof MyHomeRoute
   '/settings': typeof SettingsRoute
   '/api/chat': typeof ApiChatRoute
 }
@@ -60,21 +68,36 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/chat': typeof ChatRoute
   '/insights': typeof InsightsRoute
+  '/my-home': typeof MyHomeRoute
   '/settings': typeof SettingsRoute
   '/api/chat': typeof ApiChatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/chat' | '/insights' | '/settings' | '/api/chat'
+  fullPaths:
+    | '/'
+    | '/chat'
+    | '/insights'
+    | '/my-home'
+    | '/settings'
+    | '/api/chat'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/chat' | '/insights' | '/settings' | '/api/chat'
-  id: '__root__' | '/' | '/chat' | '/insights' | '/settings' | '/api/chat'
+  to: '/' | '/chat' | '/insights' | '/my-home' | '/settings' | '/api/chat'
+  id:
+    | '__root__'
+    | '/'
+    | '/chat'
+    | '/insights'
+    | '/my-home'
+    | '/settings'
+    | '/api/chat'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ChatRoute: typeof ChatRoute
   InsightsRoute: typeof InsightsRoute
+  MyHomeRoute: typeof MyHomeRoute
   SettingsRoute: typeof SettingsRoute
   ApiChatRoute: typeof ApiChatRoute
 }
@@ -86,6 +109,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/my-home': {
+      id: '/my-home'
+      path: '/my-home'
+      fullPath: '/my-home'
+      preLoaderRoute: typeof MyHomeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/insights': {
@@ -123,6 +153,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ChatRoute: ChatRoute,
   InsightsRoute: InsightsRoute,
+  MyHomeRoute: MyHomeRoute,
   SettingsRoute: SettingsRoute,
   ApiChatRoute: ApiChatRoute,
 }
