@@ -45,14 +45,19 @@
 
 :root {
   /* Enpal brand tokens */
-  --navy: oklch(0.27 0.05 245);          /* #072543 */
+  --navy: oklch(0.27 0.05 245); /* #072543 */
   --navy-soft: oklch(0.36 0.05 245);
-  --yellow: oklch(0.83 0.16 85);          /* #FFB000 */
-  --cta: oklch(0.88 0.16 92);             /* #FFD233 */
-  --sunshine: oklch(0.92 0.12 95);        /* #FFDD66 */
-  --stone: oklch(0.55 0.03 240);          /* #6A7C8E */
-  --grass: oklch(0.75 0.15 145);          /* #76BE74 */
-  --dodger: oklch(0.60 0.20 260);         /* #3E7EFF */
+  --yellow: oklch(0.83 0.16 85); /* #FFB000 */
+  --cta: oklch(0.88 0.16 92); /* #FFD233 */
+  --sunshine: oklch(0.92 0.12 95); /* #FFDD66 */
+  --stone: oklch(0.55 0.03 240); /* #6A7C8E */
+  --grass: oklch(0.75 0.15 145); /* #76BE74 */
+  --dodger: oklch(0.6 0.2 260); /* #3E7EFF */
+
+  --brand-navy: #072543;
+  --brand-yellow: #ffd233;
+  --brand-stone: #6a7c8e;
+  --brand-green: #76be74;
 
   --background: oklch(0.985 0.005 240);
   --foreground: var(--navy);
@@ -68,7 +73,7 @@
   --muted-foreground: var(--stone);
   --accent: var(--cta);
   --accent-foreground: var(--navy);
-  --destructive: oklch(0.60 0.22 27);
+  --destructive: oklch(0.6 0.22 27);
   --destructive-foreground: oklch(1 0 0);
   --border: oklch(0.92 0.01 240);
   --input: oklch(0.92 0.01 240);
@@ -77,8 +82,11 @@
 }
 
 @layer base {
-  * { border-color: var(--color-border); }
-  html, body {
+  * {
+    border-color: var(--color-border);
+  }
+  html,
+  body {
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
@@ -86,40 +94,100 @@
     line-height: 1.7;
     -webkit-font-smoothing: antialiased;
   }
-  h1, h2, h3, h4, .font-display {
+  h1,
+  h2,
+  h3,
+  h4,
+  .font-display {
     font-weight: 600;
     line-height: 1.15;
     letter-spacing: -0.01em;
   }
-  h1 { font-size: 46px; }
-  h2 { font-size: 36px; }
-  h3 { font-size: 22px; }
+  h1 {
+    font-size: 46px;
+  }
+  h2 {
+    font-size: 36px;
+  }
+  h3 {
+    font-size: 22px;
+  }
 }
 
 @layer components {
   .btn-cta {
-    display: inline-flex; align-items: center; gap: 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
     background-color: var(--color-cta);
     color: var(--color-navy);
-    font-weight: 600; font-size: 16px;
-    padding: 0.75rem 1.25rem; border-radius: 14px;
-    transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+    font-weight: 600;
+    font-size: 16px;
+    padding: 0.75rem 1.25rem;
+    border-radius: 14px;
+    transition:
+      transform 0.15s ease,
+      box-shadow 0.15s ease,
+      filter 0.15s ease;
     box-shadow: 0 6px 18px -10px color-mix(in oklab, var(--color-cta) 60%, transparent);
   }
-  .btn-cta:hover { filter: brightness(0.97); transform: translateY(-1px); }
+  .btn-cta:hover {
+    filter: brightness(0.97);
+    transform: translateY(-1px);
+  }
   .btn-ghost-navy {
-    display: inline-flex; align-items: center; gap: 0.5rem;
-    background-color: transparent; color: var(--color-navy);
-    font-weight: 600; font-size: 15px;
-    padding: 0.6rem 1rem; border-radius: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background-color: transparent;
+    color: var(--color-navy);
+    font-weight: 600;
+    font-size: 15px;
+    padding: 0.6rem 1rem;
+    border-radius: 14px;
     border: 1px solid color-mix(in oklab, var(--color-navy) 15%, transparent);
   }
-  .btn-ghost-navy:hover { background: color-mix(in oklab, var(--color-navy) 4%, transparent); }
+  .btn-ghost-navy:hover {
+    background: color-mix(in oklab, var(--color-navy) 4%, transparent);
+  }
   .card-soft {
     background: var(--color-card);
     border-radius: 18px;
-    box-shadow: 0 1px 0 color-mix(in oklab, var(--color-navy) 5%, transparent),
-                0 12px 32px -20px color-mix(in oklab, var(--color-navy) 25%, transparent);
+    box-shadow:
+      0 1px 0 color-mix(in oklab, var(--color-navy) 5%, transparent),
+      0 12px 32px -20px color-mix(in oklab, var(--color-navy) 25%, transparent);
     border: 1px solid color-mix(in oklab, var(--color-navy) 6%, transparent);
   }
+}
+
+@keyframes pulse-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.pulse-enter {
+  animation: pulse-slide-up 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes pulse-typing {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
+
+.pulse-typing-dot {
+  animation: pulse-typing 1.2s infinite;
 }

@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
-import { ArrowRight, FileText, MessageCircle } from "lucide-react";
+import { ArrowRight, FileText, MessageCircle, Settings } from "lucide-react";
 import { z } from "zod";
 
 import { AppShell, useActiveHouseholdId } from "@/components/AppShell";
@@ -21,12 +21,14 @@ function summaryQueryOptions(householdId: string) {
 export const Route = createFileRoute("/")({
   validateSearch: searchSchema,
   loaderDeps: ({ search }) => ({ hh: search.hh ?? DEFAULT_HOUSEHOLD_ID }),
-  loader: ({ context, deps }) =>
-    context.queryClient.ensureQueryData(summaryQueryOptions(deps.hh)),
+  loader: ({ context, deps }) => context.queryClient.ensureQueryData(summaryQueryOptions(deps.hh)),
   head: () => ({
     meta: [
       { title: "Enpal Pulse — Your home energy at a glance" },
-      { name: "description", content: "Today's solar, battery, consumption and savings for your Enpal home." },
+      {
+        name: "description",
+        content: "Today's solar, battery, consumption and savings for your Enpal home.",
+      },
     ],
   }),
   component: HomePage,
@@ -84,8 +86,15 @@ function HomePage() {
           />
           <Chip label="Exported to grid" value={`${s.grid_export_kwh.toFixed(1)} kWh`} />
           <Chip label="Bought from grid" value={`${s.grid_import_kwh.toFixed(1)} kWh`} />
-          <Chip label={`${monthLabel} bill so far`} value={`€${thisMonth?.total_bill_eur.toFixed(2) ?? "—"}`} />
-          <Chip label="Cheapest 3h today" value={`${today.cheapest_3h_window.start_hour}:00–${today.cheapest_3h_window.end_hour}:00`} tone="cta" />
+          <Chip
+            label={`${monthLabel} bill so far`}
+            value={`€${thisMonth?.total_bill_eur.toFixed(2) ?? "—"}`}
+          />
+          <Chip
+            label="Cheapest 3h today"
+            value={`${today.cheapest_3h_window.start_hour}:00–${today.cheapest_3h_window.end_hour}:00`}
+            tone="cta"
+          />
         </section>
 
         {featured && (
@@ -100,7 +109,9 @@ function HomePage() {
               <div className="flex items-start gap-4">
                 <div
                   className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
-                    featured.severity === "high" ? "bg-destructive/10 text-destructive" : "bg-cta/30 text-navy"
+                    featured.severity === "high"
+                      ? "bg-destructive/10 text-destructive"
+                      : "bg-cta/30 text-navy"
                   }`}
                 >
                   {featured.type === "anomaly" ? "!" : featured.type === "nudge" ? "★" : "i"}
@@ -116,7 +127,11 @@ function HomePage() {
                   <h3 className="text-navy text-xl">{featured.title}</h3>
                   <p className="text-stone mt-2 leading-relaxed">{featured.detail}</p>
                   <div className="mt-5 flex flex-wrap gap-3">
-                    <Link to="/chat" search={{ hh: householdId, q: featured.suggested_action }} className="btn-cta">
+                    <Link
+                      to="/chat"
+                      search={{ hh: householdId, q: featured.suggested_action }}
+                      className="btn-cta"
+                    >
                       {featured.suggested_action}
                       <ArrowRight className="w-4 h-4" />
                     </Link>
@@ -127,8 +142,12 @@ function HomePage() {
           </section>
         )}
 
-        <section className="grid sm:grid-cols-2 gap-4">
-          <Link to="/chat" search={{ hh: householdId }} className="card-soft p-5 flex items-center justify-between hover:shadow-lg transition group">
+        <section className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Link
+            to="/chat"
+            search={{ hh: householdId }}
+            className="card-soft p-5 flex items-center justify-between hover:shadow-lg transition group"
+          >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-cta/30 flex items-center justify-center">
                 <MessageCircle className="w-5 h-5 text-navy" />
@@ -152,6 +171,21 @@ function HomePage() {
               <div>
                 <div className="font-display text-navy">View contract</div>
                 <div className="text-sm text-stone">Tariff, term, maintenance</div>
+              </div>
+            </div>
+            <ArrowRight className="w-5 h-5 text-stone group-hover:text-navy transition" />
+          </Link>
+          <Link
+            to="/welcome"
+            className="card-soft p-5 flex items-center justify-between hover:shadow-lg transition group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-cta/30 flex items-center justify-center">
+                <Settings className="w-5 h-5 text-navy" />
+              </div>
+              <div>
+                <div className="font-display text-navy">Personalize setup</div>
+                <div className="text-sm text-stone">Tailor tips to your home</div>
               </div>
             </div>
             <ArrowRight className="w-5 h-5 text-stone group-hover:text-navy transition" />
@@ -182,7 +216,9 @@ function Chip({
   const bg = tone === "cta" ? "bg-cta/20" : "bg-white";
   return (
     <div className={`card-soft px-4 py-3 ${bg}`}>
-      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-stone">{label}</div>
+      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-stone">
+        {label}
+      </div>
       <div className={`mt-1 font-display text-lg ${valueColor}`}>{value}</div>
     </div>
   );
