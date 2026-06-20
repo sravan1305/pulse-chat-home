@@ -195,18 +195,20 @@ function round(n: number, d: number) {
 
 // ---- View builders ----
 
-export async function buildTodayView(householdId: string, origin: string): Promise<TodayView> {
-  const records = await getTimeseries(householdId, origin);
-  const today = recordsForDate(records, DEMO_TODAY);
-  const hourly = aggregateHourly(today);
-  const summary = summarizeDay(today, DEMO_TODAY);
+function buildTodayViewFromRecords(
+  records: TimeseriesRecord[],
+  date: string,
+  hour: number,
+): TodayView {
+  const day = recordsForDate(records, date);
+  const hourly = aggregateHourly(day);
+  const summary = summarizeDay(day, date);
 
-  // Pick the 15-min record closest to the synthetic "now" hour.
-  const target = `${DEMO_TODAY}T${String(DEMO_NOW_HOUR).padStart(2, "0")}:00`;
+  const target = `${date}T${String(hour).padStart(2, "0")}:00`;
   const live =
-    today.find((r) => r.timestamp.startsWith(target)) ??
-    today[Math.min(DEMO_NOW_HOUR * 4, today.length - 1)] ??
-    today[today.length - 1] ??
+    day.find((r) => r.timestamp.startsWith(target)) ??
+    day[Math.min(hour * 4, day.length - 1)] ??
+    day[day.length - 1] ??
     records[records.length - 1];
 
   const now: LiveSnapshot = {
@@ -225,11 +227,68 @@ export async function buildTodayView(householdId: string, origin: string): Promi
   };
 
   return {
-    date: DEMO_TODAY,
+    date,
     summary,
     hourly,
     cheapest_3h_window: cheapestWindow(hourly, 3),
     now,
+  };
+}
+
+export async function buildTodayView(
+  householdId: string,
+  origin: string,
+  date: string = DEMO_TODAY,
+  hour: number = DEMO_NOW_HOUR,
+): Promise<TodayView> {
+  const records = await getTimeseries(householdId, origin);
+  return buildTodayViewFromRecords(records, date, hour);
+}
+
+export type ComparisonMode = "1w" | "1mo" | "1y";
+
+export type ComparisonView = {
+  today: TodayView;
+  baseline: TodayView;
+  baselineDate: string;
+  cmp: ComparisonMode;
+  synthetic: boolean; // true when baseline was clamped to dataset bounds
+  dateRange: { min: string; max: string };
+};
+
+function clampDate(date: string, min: string, max: string) {
+  if (date < min) return min;
+  if (date > max) return max;
+  return date;
+}
+
+export async function buildComparisonView(
+  householdId: string,
+  origin: string,
+  date: string,
+  hour: number,
+  cmp: ComparisonMode,
+): Promise<ComparisonView> {
+  const records = await getTimeseries(householdId, origin);
+  const minDate = dateKey(records[0].timestamp);
+  const maxDate = dateKey(records[records.length - 1].timestamp);
+
+  const safeDate = clampDate(date, minDate, maxDate);
+  const offsetDays = cmp === "1w" ? -7 : cmp === "1mo" ? -30 : -365;
+  const rawBaseline = addDays(safeDate, offsetDays);
+  const baselineDate = clampDate(rawBaseline, minDate, maxDate);
+  const synthetic = baselineDate !== rawBaseline;
+
+  const today = buildTodayViewFromRecords(records, safeDate, hour);
+  const baseline = buildTodayViewFromRecords(records, baselineDate, hour);
+
+  return {
+    today,
+    baseline,
+    baselineDate,
+    cmp,
+    synthetic,
+    dateRange: { min: minDate, max: maxDate },
   };
 }
 

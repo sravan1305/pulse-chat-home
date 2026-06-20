@@ -1,32 +1,54 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
-import { ArrowRight, FileText, MessageCircle } from "lucide-react";
+import { ArrowRight, FileText, MessageCircle, Settings } from "lucide-react";
 import { z } from "zod";
 
 import { AppShell, useActiveHouseholdId } from "@/components/AppShell";
 import { EnergyFlow } from "@/components/EnergyFlow";
-import { getHouseholdSummaryFn } from "@/lib/data-functions";
-import { DEFAULT_HOUSEHOLD_ID } from "@/lib/demo-config";
+import { HomeHeader, type CmpMode } from "@/components/HomeHeader";
+import { ComparisonStrip } from "@/components/ComparisonStrip";
+import { getHomeComparisonFn } from "@/lib/data-functions";
+import { DEFAULT_HOUSEHOLD_ID, DEMO_NOW_HOUR, DEMO_TODAY } from "@/lib/demo-config";
 
-const searchSchema = z.object({ hh: z.string().optional() });
+const searchSchema = z.object({
+  hh: z.string().optional(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  hour: z.number().int().min(0).max(23).optional(),
+  cmp: z.enum(["1w", "1mo", "1y"]).optional(),
+});
 
-function summaryQueryOptions(householdId: string) {
+function homeQueryOptions(input: {
+  householdId: string;
+  date: string;
+  hour: number;
+  cmp: CmpMode;
+}) {
   return queryOptions({
-    queryKey: ["household-summary", householdId],
-    queryFn: () => getHouseholdSummaryFn({ data: { householdId } }),
+    queryKey: ["home-comparison", input.householdId, input.date, input.hour, input.cmp],
+    queryFn: () => getHomeComparisonFn({ data: input }),
     staleTime: 60_000,
   });
 }
 
 export const Route = createFileRoute("/")({
   validateSearch: searchSchema,
-  loaderDeps: ({ search }) => ({ hh: search.hh ?? DEFAULT_HOUSEHOLD_ID }),
+  loaderDeps: ({ search }) => ({
+    hh: search.hh ?? DEFAULT_HOUSEHOLD_ID,
+    date: search.date ?? DEMO_TODAY,
+    hour: search.hour ?? DEMO_NOW_HOUR,
+    cmp: (search.cmp ?? "1w") as CmpMode,
+  }),
   loader: ({ context, deps }) =>
-    context.queryClient.ensureQueryData(summaryQueryOptions(deps.hh)),
+    context.queryClient.ensureQueryData(
+      homeQueryOptions({ householdId: deps.hh, date: deps.date, hour: deps.hour, cmp: deps.cmp }),
+    ),
   head: () => ({
     meta: [
       { title: "Enpal Pulse — Your home energy at a glance" },
-      { name: "description", content: "Today's solar, battery, consumption and savings for your Enpal home." },
+      {
+        name: "description",
+        content: "Today's solar, battery, consumption and savings for your Enpal home.",
+      },
     ],
   }),
   component: HomePage,
@@ -34,11 +56,18 @@ export const Route = createFileRoute("/")({
 
 function HomePage() {
   const householdId = useActiveHouseholdId();
-  const { data } = useSuspenseQuery(summaryQueryOptions(householdId));
-  const { household, today, bills, insights } = data;
+  const search = Route.useSearch();
+  const date = search.date ?? DEMO_TODAY;
+  const hour = search.hour ?? DEMO_NOW_HOUR;
+  const cmp = (search.cmp ?? "1w") as CmpMode;
+
+  const { data } = useSuspenseQuery(homeQueryOptions({ householdId, date, hour, cmp }));
+  const { household, comparison, bills, insights } = data;
+  const today = comparison.today;
+  const baseline = comparison.baseline;
   const s = today.summary;
 
-  const monthKey = today.date.slice(0, 7); // YYYY-MM
+  const monthKey = today.date.slice(0, 7);
   const prev = (() => {
     const [y, m] = monthKey.split("-").map(Number);
     const d = new Date(Date.UTC(y, m - 1, 1));
@@ -55,23 +84,28 @@ function HomePage() {
 
   return (
     <AppShell>
-      <div className="space-y-8">
+      <div className="space-y-6">
         <div>
           <p className="text-stone font-semibold text-sm uppercase tracking-wider">
             Good day, {household.name}
           </p>
-          <h1 className="mt-2 text-navy">Your home today</h1>
-          <p className="text-stone mt-1">
-            {new Date(today.date).toLocaleDateString("en-GB", {
-              weekday: "long",
-              day: "numeric",
-              month: "long",
-            })}{" "}
-            · {household.city}
-          </p>
+          <h1 className="mt-2 text-navy">Your home, time-travelled</h1>
         </div>
 
-        <EnergyFlow snapshot={today.now} />
+        <HomeHeader
+          date={today.date}
+          cmp={comparison.cmp}
+          baselineDate={comparison.baselineDate}
+          synthetic={comparison.synthetic}
+          range={comparison.dateRange}
+          todayTemp={today.now.outdoor_temp_c}
+          baselineTemp={baseline.now.outdoor_temp_c}
+          city={household.city}
+        />
+
+        <EnergyFlow snapshot={today.now} baselineSnapshot={baseline.now} baselineDate={comparison.baselineDate} />
+
+        <ComparisonStrip today={today} baseline={baseline} />
 
         <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Chip label="Solar today" value={`${s.pv_kwh.toFixed(1)} kWh`} tone="grass" />
@@ -84,8 +118,15 @@ function HomePage() {
           />
           <Chip label="Exported to grid" value={`${s.grid_export_kwh.toFixed(1)} kWh`} />
           <Chip label="Bought from grid" value={`${s.grid_import_kwh.toFixed(1)} kWh`} />
-          <Chip label={`${monthLabel} bill so far`} value={`€${thisMonth?.total_bill_eur.toFixed(2) ?? "—"}`} />
-          <Chip label="Cheapest 3h today" value={`${today.cheapest_3h_window.start_hour}:00–${today.cheapest_3h_window.end_hour}:00`} tone="cta" />
+          <Chip
+            label={`${monthLabel} bill so far`}
+            value={`€${thisMonth?.total_bill_eur.toFixed(2) ?? "—"}`}
+          />
+          <Chip
+            label="Cheapest 3h today"
+            value={`${today.cheapest_3h_window.start_hour}:00–${today.cheapest_3h_window.end_hour}:00`}
+            tone="cta"
+          />
         </section>
 
         {featured && (
@@ -100,7 +141,9 @@ function HomePage() {
               <div className="flex items-start gap-4">
                 <div
                   className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
-                    featured.severity === "high" ? "bg-destructive/10 text-destructive" : "bg-cta/30 text-navy"
+                    featured.severity === "high"
+                      ? "bg-destructive/10 text-destructive"
+                      : "bg-cta/30 text-navy"
                   }`}
                 >
                   {featured.type === "anomaly" ? "!" : featured.type === "nudge" ? "★" : "i"}
@@ -116,7 +159,11 @@ function HomePage() {
                   <h3 className="text-navy text-xl">{featured.title}</h3>
                   <p className="text-stone mt-2 leading-relaxed">{featured.detail}</p>
                   <div className="mt-5 flex flex-wrap gap-3">
-                    <Link to="/chat" search={{ hh: householdId, q: featured.suggested_action }} className="btn-cta">
+                    <Link
+                      to="/chat"
+                      search={{ hh: householdId, q: featured.suggested_action }}
+                      className="btn-cta"
+                    >
                       {featured.suggested_action}
                       <ArrowRight className="w-4 h-4" />
                     </Link>
@@ -127,8 +174,12 @@ function HomePage() {
           </section>
         )}
 
-        <section className="grid sm:grid-cols-2 gap-4">
-          <Link to="/chat" search={{ hh: householdId }} className="card-soft p-5 flex items-center justify-between hover:shadow-lg transition group">
+        <section className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Link
+            to="/chat"
+            search={{ hh: householdId }}
+            className="card-soft p-5 flex items-center justify-between hover:shadow-lg transition group"
+          >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-cta/30 flex items-center justify-center">
                 <MessageCircle className="w-5 h-5 text-navy" />
@@ -152,6 +203,21 @@ function HomePage() {
               <div>
                 <div className="font-display text-navy">View contract</div>
                 <div className="text-sm text-stone">Tariff, term, maintenance</div>
+              </div>
+            </div>
+            <ArrowRight className="w-5 h-5 text-stone group-hover:text-navy transition" />
+          </Link>
+          <Link
+            to="/welcome"
+            className="card-soft p-5 flex items-center justify-between hover:shadow-lg transition group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-cta/30 flex items-center justify-center">
+                <Settings className="w-5 h-5 text-navy" />
+              </div>
+              <div>
+                <div className="font-display text-navy">Personalize setup</div>
+                <div className="text-sm text-stone">Tailor tips to your home</div>
               </div>
             </div>
             <ArrowRight className="w-5 h-5 text-stone group-hover:text-navy transition" />
@@ -182,7 +248,9 @@ function Chip({
   const bg = tone === "cta" ? "bg-cta/20" : "bg-white";
   return (
     <div className={`card-soft px-4 py-3 ${bg}`}>
-      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-stone">{label}</div>
+      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-stone">
+        {label}
+      </div>
       <div className={`mt-1 font-display text-lg ${valueColor}`}>{value}</div>
     </div>
   );

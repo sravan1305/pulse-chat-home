@@ -1,4 +1,4 @@
-import { Battery, Car, Flame, Home, Sun, Zap } from "lucide-react";
+import { Battery, Car, Flame, Home, Sun, Zap, ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from "lucide-react";
 
 export type EnergyFlowSnapshot = {
   pv_kw: number;
@@ -13,141 +13,93 @@ export type EnergyFlowSnapshot = {
   price_eur_per_kwh: number;
 };
 
-// Brand-tuned colors (Enpal): Grass Green for production / export flow,
-// CTA Yellow accents on key totals, a brand-friendly red for consumption /
-// grid import flow. All on the Downriver navy surface.
 const C = {
-  produce: "#76BE74", // Grass Green
-  consume: "#FF6B6B", // brand-friendly red (not the harsh destructive)
-  idle: "#1B3A5C",
+  produce: "#76BE74",
+  consume: "#FF6B6B",
+  cta: "#FFD233",
   border: "rgba(255,255,255,0.10)",
   text: "rgba(255,255,255,0.65)",
-  white: "#ffffff",
-  cta: "#FFD233",
+  muted: "rgba(255,255,255,0.45)",
 } as const;
 
 function fmt(kw: number) {
   return kw < 0.05 ? "0.0" : kw.toFixed(1);
 }
 
-type FlowProps = {
-  d: string;
-  active: boolean;
-  produce: boolean; // true = green producing-to-house / exporting; false = red consuming
-  magnitude: number; // kW
-  reverse?: boolean;
-};
+type Tone = "produce" | "consume" | "idle";
 
-function Flow({ d, active, produce, magnitude, reverse }: FlowProps) {
-  if (!active) {
-    return <path d={d} stroke={C.idle} strokeWidth={2} fill="none" strokeLinecap="round" />;
-  }
-  const color = produce ? C.produce : C.consume;
-  const width = Math.max(2.2, Math.min(5, 2 + magnitude * 0.7));
-  // duration shrinks with magnitude — bigger flow moves faster.
-  const dur = Math.max(0.9, 2.8 - Math.min(2, magnitude * 0.35));
-  return (
-    <>
-      <path d={d} stroke={C.idle} strokeWidth={2} fill="none" strokeLinecap="round" />
-      <path
-        d={d}
-        stroke={color}
-        strokeWidth={width}
-        strokeLinecap="round"
-        strokeDasharray="6 10"
-        fill="none"
-        style={{
-          filter: `drop-shadow(0 0 6px ${color}66)`,
-        }}
-      >
-        <animate
-          attributeName="stroke-dashoffset"
-          from={reverse ? "0" : "16"}
-          to={reverse ? "16" : "0"}
-          dur={`${dur}s`}
-          repeatCount="indefinite"
-        />
-      </path>
-    </>
-  );
-}
-
-function Node({
-  cx,
-  cy,
+function Tile({
   icon,
   label,
   value,
   unit,
+  state,
   tone,
-  size = 56,
+  arrow,
 }: {
-  cx: number;
-  cy: number;
   icon: React.ReactNode;
   label: string;
   value: string;
   unit: string;
-  tone: "produce" | "consume" | "idle" | "house";
-  size?: number;
+  state: string;
+  tone: Tone;
+  arrow?: React.ReactNode;
 }) {
-  const ring =
-    tone === "produce"
-      ? C.produce
-      : tone === "consume"
-        ? C.consume
-        : tone === "house"
-          ? C.cta
-          : "rgba(255,255,255,0.20)";
-  const valColor =
-    tone === "produce" ? C.produce : tone === "consume" ? C.consume : tone === "house" ? C.cta : C.text;
+  const accent = tone === "produce" ? C.produce : tone === "consume" ? C.consume : "rgba(255,255,255,0.20)";
+  const valueColor = tone === "produce" ? C.produce : tone === "consume" ? C.consume : "#fff";
   return (
-    <foreignObject x={cx - 60} y={cy - size / 2 - 4} width={120} height={size + 56}>
-      <div className="flex flex-col items-center text-center select-none">
+    <div
+      className="rounded-2xl p-4 flex flex-col gap-2"
+      style={{
+        background: "rgba(255,255,255,0.04)",
+        border: `1px solid ${tone === "idle" ? C.border : accent + "55"}`,
+      }}
+    >
+      <div className="flex items-center justify-between">
         <div
-          className="flex items-center justify-center rounded-2xl"
-          style={{
-            width: size,
-            height: size,
-            background: tone === "house" ? "rgba(255,210,51,0.10)" : "rgba(255,255,255,0.04)",
-            border: `1.5px solid ${ring}`,
-            boxShadow: tone !== "idle" ? `0 0 24px -6px ${ring}55` : "none",
-            color: tone === "house" ? C.cta : tone === "produce" ? C.produce : tone === "consume" ? C.consume : C.white,
-          }}
+          className="w-9 h-9 rounded-xl flex items-center justify-center"
+          style={{ background: "rgba(255,255,255,0.05)", color: tone === "produce" ? C.produce : tone === "consume" ? C.consume : "#fff" }}
         >
           {icon}
         </div>
-        <div className="mt-2 text-[11px] uppercase tracking-[0.14em] font-semibold" style={{ color: "rgba(255,255,255,0.45)" }}>
-          {label}
-        </div>
-        <div className="mt-0.5 leading-none">
-          <span className="text-base font-semibold" style={{ color: valColor }}>
-            {value}
-          </span>
-          <span className="text-[11px] ml-1" style={{ color: "rgba(255,255,255,0.50)" }}>
-            {unit}
-          </span>
-        </div>
+        {arrow && <div style={{ color: accent }}>{arrow}</div>}
       </div>
-    </foreignObject>
+      <div className="text-[10px] uppercase tracking-[0.14em] font-semibold" style={{ color: C.muted }}>
+        {label}
+      </div>
+      <div className="leading-none">
+        <span className="text-xl font-semibold" style={{ color: valueColor }}>
+          {value}
+        </span>
+        <span className="text-[11px] ml-1" style={{ color: C.text }}>
+          {unit}
+        </span>
+      </div>
+      <div className="text-[11px] font-medium" style={{ color: tone === "idle" ? C.muted : accent }}>
+        {state}
+      </div>
+    </div>
   );
 }
 
-export function EnergyFlow({ snapshot }: { snapshot: EnergyFlowSnapshot }) {
+export function EnergyFlow({
+  snapshot,
+  baselineSnapshot,
+  baselineDate,
+}: {
+  snapshot: EnergyFlowSnapshot;
+  baselineSnapshot?: EnergyFlowSnapshot & { outdoor_temp_c?: number };
+  baselineDate?: string;
+}) {
   const s = snapshot;
   const exporting = s.grid_export_kw > 0.05;
+  const importing = s.grid_import_kw > 0.05;
   const charging = s.battery_charge_kw > 0.05;
   const discharging = s.battery_discharge_kw > 0.05;
+  const pvOn = s.pv_kw > 0.05;
   const hpOn = s.heatpump_kw > 0.05;
   const evOn = s.ev_kw > 0.05;
-  const importing = s.grid_import_kw > 0.05;
-  const pvOn = s.pv_kw > 0.05;
 
-  // Layout on a 720 x 460 canvas — house at center, sources orbit around.
-  const cx = 360,
-    cy = 230;
-
-  // Status line
   const headline = exporting
     ? "Exporting clean energy"
     : pvOn && !importing
@@ -159,152 +111,143 @@ export function EnergyFlow({ snapshot }: { snapshot: EnergyFlowSnapshot }) {
           : "Idle";
   const headlineColor = exporting || (pvOn && !importing) || discharging ? C.produce : importing ? C.consume : C.text;
 
+  // Hero house bar — scale against a sensible peak (6 kW) or actual if higher.
+  const peak = Math.max(6, s.house_load_kw);
+  const pct = Math.min(100, Math.round((s.house_load_kw / peak) * 100));
+
   return (
     <section
       className="relative overflow-hidden rounded-[28px] border"
       style={{
-        background:
-          "linear-gradient(135deg, #072543 0%, #0a2d52 55%, #0c386a 100%)",
+        background: "linear-gradient(135deg, #072543 0%, #0a2d52 100%)",
         borderColor: C.border,
-        boxShadow: "0 30px 80px -40px rgba(7,37,67,0.55)",
       }}
     >
-      {/* ambient glows */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -top-20 -left-20 w-[420px] h-[420px] rounded-full"
-        style={{ background: "radial-gradient(closest-side, rgba(118,190,116,0.18), transparent 70%)" }}
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -bottom-24 -right-16 w-[420px] h-[420px] rounded-full"
-        style={{ background: "radial-gradient(closest-side, rgba(255,210,51,0.10), transparent 70%)" }}
-      />
-
-      <div className="relative px-6 pt-6 md:px-8 md:pt-8 flex items-start justify-between gap-4">
+      <div className="px-6 pt-6 md:px-8 md:pt-8 flex items-start justify-between gap-4">
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: "rgba(255,255,255,0.55)" }}>
-            Live energy flow
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-2 w-2 rounded-full" style={{ background: C.produce }} />
+            <span className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: C.muted }}>
+              Home right now
+            </span>
           </div>
-          <h2 className="mt-1 text-white" style={{ color: headlineColor }}>
+          <h2 className="mt-1" style={{ color: headlineColor }}>
             {headline}
           </h2>
-          <div className="mt-1 text-sm" style={{ color: "rgba(255,255,255,0.6)" }}>
-            {s.price_eur_per_kwh > 0
-              ? <>Current price <span className="text-white font-semibold">€{s.price_eur_per_kwh.toFixed(2)}/kWh</span></>
-              : "—"}
+        </div>
+        {s.price_eur_per_kwh > 0 && (
+          <div className="text-right">
+            <div className="text-[11px] uppercase tracking-[0.14em]" style={{ color: C.muted }}>
+              Current price
+            </div>
+            <div className="text-base font-semibold text-white">€{s.price_eur_per_kwh.toFixed(2)}<span className="text-xs font-medium" style={{ color: C.text }}>/kWh</span></div>
+          </div>
+        )}
+      </div>
+
+      {/* Hero: house load */}
+      <div className="px-6 md:px-8 mt-6">
+        <div
+          className="rounded-2xl p-5 flex items-center gap-5"
+          style={{ background: "rgba(255,210,51,0.06)", border: `1px solid ${C.cta}33` }}
+        >
+          <div
+            className="w-14 h-14 rounded-2xl flex items-center justify-center"
+            style={{ background: "rgba(255,210,51,0.12)", color: C.cta, border: `1px solid ${C.cta}55` }}
+          >
+            <Home className="w-7 h-7" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-baseline justify-between gap-3">
+              <div className="text-[11px] uppercase tracking-[0.14em] font-semibold" style={{ color: C.muted }}>
+                House load
+              </div>
+              <div className="text-[11px]" style={{ color: C.muted }}>
+                of {peak.toFixed(0)} kW peak
+              </div>
+            </div>
+            <div className="mt-1 leading-none">
+              <span className="text-3xl font-semibold" style={{ color: C.cta }}>{fmt(s.house_load_kw)}</span>
+              <span className="text-sm ml-1.5" style={{ color: C.text }}>kW</span>
+            </div>
+            <div className="mt-3 h-1.5 w-full rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
+              <div className="h-full rounded-full" style={{ width: `${pct}%`, background: C.cta }} />
+            </div>
           </div>
         </div>
+      </div>
+
+      {/* Tiles */}
+      <div className="px-6 md:px-8 pb-7 mt-4 grid grid-cols-2 md:grid-cols-5 gap-3">
+        <Tile
+          icon={<Sun className="w-4 h-4" />}
+          label="Solar"
+          value={fmt(s.pv_kw)}
+          unit="kW"
+          state={pvOn ? "Producing" : "Idle"}
+          tone={pvOn ? "produce" : "idle"}
+          arrow={pvOn ? <ArrowUp className="w-4 h-4" /> : null}
+        />
+        <Tile
+          icon={<Battery className="w-4 h-4" />}
+          label="Battery"
+          value={`${Math.round(s.battery_soc_pct)}`}
+          unit="%"
+          state={discharging ? `Discharging ${fmt(s.battery_discharge_kw)} kW` : charging ? `Charging ${fmt(s.battery_charge_kw)} kW` : "Idle"}
+          tone={discharging ? "produce" : charging ? "consume" : "idle"}
+          arrow={discharging ? <ArrowRight className="w-4 h-4" /> : charging ? <ArrowLeft className="w-4 h-4" /> : null}
+        />
+        <Tile
+          icon={<Zap className="w-4 h-4" />}
+          label="Grid"
+          value={fmt(exporting ? s.grid_export_kw : s.grid_import_kw)}
+          unit="kW"
+          state={exporting ? "Exporting" : importing ? "Importing" : "Idle"}
+          tone={exporting ? "produce" : importing ? "consume" : "idle"}
+          arrow={exporting ? <ArrowUp className="w-4 h-4" /> : importing ? <ArrowDown className="w-4 h-4" /> : null}
+        />
+        <Tile
+          icon={<Flame className="w-4 h-4" />}
+          label="Heat pump"
+          value={fmt(s.heatpump_kw)}
+          unit="kW"
+          state={hpOn ? "Heating" : "Off"}
+          tone={hpOn ? "consume" : "idle"}
+        />
+        <Tile
+          icon={<Car className="w-4 h-4" />}
+          label="EV"
+          value={fmt(s.ev_kw)}
+          unit="kW"
+          state={evOn ? "Charging" : "Not plugged in"}
+          tone={evOn ? "consume" : "idle"}
+        />
+      </div>
+
+      {baselineSnapshot && baselineDate && (
         <div
-          className="flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-semibold uppercase tracking-[0.16em]"
-          style={{ background: "rgba(118,190,116,0.12)", color: C.produce, border: `1px solid ${C.produce}33` }}
+          className="px-6 md:px-8 py-3 border-t text-xs flex flex-wrap items-center gap-x-3 gap-y-1"
+          style={{ borderColor: C.border, color: C.text, background: "rgba(0,0,0,0.12)" }}
         >
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: C.produce }} />
-            <span className="relative inline-flex rounded-full h-2 w-2" style={{ background: C.produce }} />
+          <span className="uppercase tracking-[0.14em] font-semibold" style={{ color: C.muted }}>
+            Same hour, {new Date(baselineDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
           </span>
-          Live
+          <span className="opacity-40">·</span>
+          <span>Solar <span className="text-white font-medium">{fmt(baselineSnapshot.pv_kw)} kW</span></span>
+          <span className="opacity-40">·</span>
+          <span>Grid {baselineSnapshot.grid_export_kw > baselineSnapshot.grid_import_kw ? "export" : "import"}{" "}
+            <span className="text-white font-medium">
+              {fmt(Math.max(baselineSnapshot.grid_import_kw, baselineSnapshot.grid_export_kw))} kW
+            </span>
+          </span>
+          {typeof baselineSnapshot.outdoor_temp_c === "number" && (
+            <>
+              <span className="opacity-40">·</span>
+              <span>{baselineSnapshot.outdoor_temp_c.toFixed(0)}°C outside</span>
+            </>
+          )}
         </div>
-      </div>
-
-      <div className="relative w-full">
-        <svg viewBox="0 0 720 500" className="w-full h-auto block" preserveAspectRatio="xMidYMid meet">
-          {/* CONNECTORS */}
-          {/* Solar (top center) -> House */}
-          <Flow d={`M ${cx} 110 Q ${cx} 170 ${cx} ${cy - 38}`} active={pvOn} produce magnitude={s.pv_kw} />
-          {/* Battery (left) -> House (discharge) or House -> Battery (charge) */}
-          <Flow
-            d={`M 130 ${cy} Q 220 ${cy} ${cx - 38} ${cy}`}
-            active={charging || discharging}
-            produce={discharging}
-            magnitude={Math.max(s.battery_charge_kw, s.battery_discharge_kw)}
-            reverse={charging}
-          />
-          {/* Grid (right) <-> House  */}
-          <Flow
-            d={`M ${cx + 38} ${cy} Q 500 ${cy} 590 ${cy}`}
-            active={importing || exporting}
-            produce={exporting}
-            magnitude={Math.max(s.grid_import_kw, s.grid_export_kw)}
-            reverse={exporting}
-          />
-          {/* House -> Heat pump (bottom left) */}
-          <Flow
-            d={`M ${cx - 22} ${cy + 30} Q 240 ${cy + 100} 175 ${cy + 150}`}
-            active={hpOn}
-            produce={false}
-            magnitude={s.heatpump_kw}
-          />
-          {/* House -> EV (bottom right) */}
-          <Flow
-            d={`M ${cx + 22} ${cy + 30} Q 480 ${cy + 100} 545 ${cy + 150}`}
-            active={evOn}
-            produce={false}
-            magnitude={s.ev_kw}
-          />
-
-          {/* NODES */}
-          <Node
-            cx={cx}
-            cy={90}
-            icon={<Sun className="w-6 h-6" />}
-            label="Solar"
-            value={fmt(s.pv_kw)}
-            unit="kW"
-            tone={pvOn ? "produce" : "idle"}
-          />
-          <Node
-            cx={110}
-            cy={cy}
-            icon={<Battery className="w-6 h-6" />}
-            label={charging ? "Charging" : discharging ? "Discharging" : "Battery"}
-            value={`${Math.round(s.battery_soc_pct)}`}
-            unit="%"
-            tone={discharging ? "produce" : charging ? "consume" : "idle"}
-          />
-          <Node
-            cx={610}
-            cy={cy}
-            icon={<Zap className="w-6 h-6" />}
-            label={exporting ? "Export" : importing ? "Import" : "Grid"}
-            value={fmt(exporting ? s.grid_export_kw : s.grid_import_kw)}
-            unit="kW"
-            tone={exporting ? "produce" : importing ? "consume" : "idle"}
-          />
-          <Node
-            cx={175}
-            cy={cy + 170}
-            icon={<Flame className="w-5 h-5" />}
-            label="Heat pump"
-            value={fmt(s.heatpump_kw)}
-            unit="kW"
-            tone={hpOn ? "consume" : "idle"}
-            size={48}
-          />
-          <Node
-            cx={545}
-            cy={cy + 170}
-            icon={<Car className="w-5 h-5" />}
-            label="EV"
-            value={fmt(s.ev_kw)}
-            unit="kW"
-            tone={evOn ? "consume" : "idle"}
-            size={48}
-          />
-
-          {/* CENTER: House */}
-          <Node
-            cx={cx}
-            cy={cy}
-            icon={<Home className="w-7 h-7" />}
-            label="Home now"
-            value={fmt(s.house_load_kw)}
-            unit="kW"
-            tone="house"
-            size={76}
-          />
-        </svg>
-      </div>
+      )}
     </section>
   );
 }
