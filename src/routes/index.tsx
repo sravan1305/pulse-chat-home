@@ -168,7 +168,7 @@ function HomePage() {
                   <div className="mt-5 flex flex-wrap gap-3">
                     <Link
                       to="/chat"
-                      search={{ hh: householdId, q: featured.suggested_action }}
+                      search={{ q: featured.suggested_action }}
                       className="btn-cta"
                     >
                       {featured.suggested_action}
