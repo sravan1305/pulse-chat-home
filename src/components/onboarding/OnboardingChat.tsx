@@ -322,7 +322,7 @@ export function OnboardingChat() {
       const h = HOUSEHOLDS.find((x) => x.household_id === id);
       if (!h) return;
       setSelectedHouseholdId(id);
-      navigate({ to: "/welcome", search: { hh: id } });
+      navigate({ to: "/welcome" });
       reply(`${h.name} · ${h.city}`);
       setStep({ kind: "appliances" });
     };
