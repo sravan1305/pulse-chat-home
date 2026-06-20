@@ -5,15 +5,27 @@ import { z } from "zod";
 
 import { AppShell, useActiveHouseholdId } from "@/components/AppShell";
 import { EnergyFlow } from "@/components/EnergyFlow";
-import { getHouseholdSummaryFn } from "@/lib/data-functions";
-import { DEFAULT_HOUSEHOLD_ID } from "@/lib/demo-config";
+import { HomeHeader, type CmpMode } from "@/components/HomeHeader";
+import { ComparisonStrip } from "@/components/ComparisonStrip";
+import { getHomeComparisonFn } from "@/lib/data-functions";
+import { DEFAULT_HOUSEHOLD_ID, DEMO_NOW_HOUR, DEMO_TODAY } from "@/lib/demo-config";
 
-const searchSchema = z.object({ hh: z.string().optional() });
+const searchSchema = z.object({
+  hh: z.string().optional(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  hour: z.number().int().min(0).max(23).optional(),
+  cmp: z.enum(["1w", "1mo", "1y"]).optional(),
+});
 
-function summaryQueryOptions(householdId: string) {
+function homeQueryOptions(input: {
+  householdId: string;
+  date: string;
+  hour: number;
+  cmp: CmpMode;
+}) {
   return queryOptions({
-    queryKey: ["household-summary", householdId],
-    queryFn: () => getHouseholdSummaryFn({ data: { householdId } }),
+    queryKey: ["home-comparison", input.householdId, input.date, input.hour, input.cmp],
+    queryFn: () => getHomeComparisonFn({ data: input }),
     staleTime: 60_000,
   });
 }
@@ -36,11 +48,18 @@ export const Route = createFileRoute("/")({
 
 function HomePage() {
   const householdId = useActiveHouseholdId();
-  const { data } = useSuspenseQuery(summaryQueryOptions(householdId));
-  const { household, today, bills, insights } = data;
+  const search = Route.useSearch();
+  const date = search.date ?? DEMO_TODAY;
+  const hour = search.hour ?? DEMO_NOW_HOUR;
+  const cmp = (search.cmp ?? "1w") as CmpMode;
+
+  const { data } = useSuspenseQuery(homeQueryOptions({ householdId, date, hour, cmp }));
+  const { household, comparison, bills, insights } = data;
+  const today = comparison.today;
+  const baseline = comparison.baseline;
   const s = today.summary;
 
-  const monthKey = today.date.slice(0, 7); // YYYY-MM
+  const monthKey = today.date.slice(0, 7);
   const prev = (() => {
     const [y, m] = monthKey.split("-").map(Number);
     const d = new Date(Date.UTC(y, m - 1, 1));
@@ -57,23 +76,28 @@ function HomePage() {
 
   return (
     <AppShell>
-      <div className="space-y-8">
+      <div className="space-y-6">
         <div>
           <p className="text-stone font-semibold text-sm uppercase tracking-wider">
             Good day, {household.name}
           </p>
-          <h1 className="mt-2 text-navy">Your home today</h1>
-          <p className="text-stone mt-1">
-            {new Date(today.date).toLocaleDateString("en-GB", {
-              weekday: "long",
-              day: "numeric",
-              month: "long",
-            })}{" "}
-            · {household.city}
-          </p>
+          <h1 className="mt-2 text-navy">Your home, time-travelled</h1>
         </div>
 
-        <EnergyFlow snapshot={today.now} />
+        <HomeHeader
+          date={today.date}
+          cmp={comparison.cmp}
+          baselineDate={comparison.baselineDate}
+          synthetic={comparison.synthetic}
+          range={comparison.dateRange}
+          todayTemp={today.now.outdoor_temp_c}
+          baselineTemp={baseline.now.outdoor_temp_c}
+          city={household.city}
+        />
+
+        <EnergyFlow snapshot={today.now} baselineSnapshot={baseline.now} baselineDate={comparison.baselineDate} />
+
+        <ComparisonStrip today={today} baseline={baseline} />
 
         <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Chip label="Solar today" value={`${s.pv_kwh.toFixed(1)} kWh`} tone="grass" />
