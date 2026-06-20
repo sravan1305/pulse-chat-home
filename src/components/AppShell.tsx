@@ -51,7 +51,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     } catch {
       /* noop */
     }
-    navigate({ to: "/welcome" });
+    navigate({ to: "/" });
   };
 
   const initials = active?.name
@@ -110,7 +110,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <div className="text-xs text-stone font-medium">{active?.city}</div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => navigate({ to: "/welcome" })}>
+                <DropdownMenuItem onClick={() => navigate({ to: "/settings" })}>
                   <Settings className="w-4 h-4" /> Edit setup
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive">
