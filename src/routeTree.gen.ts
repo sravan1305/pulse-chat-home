@@ -9,13 +9,23 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as MyHomeRouteImport } from './routes/my-home'
 import { Route as InsightsRouteImport } from './routes/insights'
 import { Route as ChatRouteImport } from './routes/chat'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as WelcomeIndexRouteImport } from './routes/welcome/index'
-import { Route as WelcomeDashboardRouteImport } from './routes/welcome/dashboard'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MyHomeRoute = MyHomeRouteImport.update({
+  id: '/my-home',
+  path: '/my-home',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const InsightsRoute = InsightsRouteImport.update({
   id: '/insights',
   path: '/insights',
@@ -31,16 +41,6 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const WelcomeIndexRoute = WelcomeIndexRouteImport.update({
-  id: '/welcome/',
-  path: '/welcome/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const WelcomeDashboardRoute = WelcomeDashboardRouteImport.update({
-  id: '/welcome/dashboard',
-  path: '/welcome/dashboard',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiChatRoute = ApiChatRouteImport.update({
   id: '/api/chat',
   path: '/api/chat',
@@ -51,26 +51,26 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/chat': typeof ChatRoute
   '/insights': typeof InsightsRoute
+  '/my-home': typeof MyHomeRoute
+  '/settings': typeof SettingsRoute
   '/api/chat': typeof ApiChatRoute
-  '/welcome/dashboard': typeof WelcomeDashboardRoute
-  '/welcome/': typeof WelcomeIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/chat': typeof ChatRoute
   '/insights': typeof InsightsRoute
+  '/my-home': typeof MyHomeRoute
+  '/settings': typeof SettingsRoute
   '/api/chat': typeof ApiChatRoute
-  '/welcome/dashboard': typeof WelcomeDashboardRoute
-  '/welcome': typeof WelcomeIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/chat': typeof ChatRoute
   '/insights': typeof InsightsRoute
+  '/my-home': typeof MyHomeRoute
+  '/settings': typeof SettingsRoute
   '/api/chat': typeof ApiChatRoute
-  '/welcome/dashboard': typeof WelcomeDashboardRoute
-  '/welcome/': typeof WelcomeIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -78,38 +78,46 @@ export interface FileRouteTypes {
     | '/'
     | '/chat'
     | '/insights'
+    | '/my-home'
+    | '/settings'
     | '/api/chat'
-    | '/welcome/dashboard'
-    | '/welcome/'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/'
-    | '/chat'
-    | '/insights'
-    | '/api/chat'
-    | '/welcome/dashboard'
-    | '/welcome'
+  to: '/' | '/chat' | '/insights' | '/my-home' | '/settings' | '/api/chat'
   id:
     | '__root__'
     | '/'
     | '/chat'
     | '/insights'
+    | '/my-home'
+    | '/settings'
     | '/api/chat'
-    | '/welcome/dashboard'
-    | '/welcome/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ChatRoute: typeof ChatRoute
   InsightsRoute: typeof InsightsRoute
+  MyHomeRoute: typeof MyHomeRoute
+  SettingsRoute: typeof SettingsRoute
   ApiChatRoute: typeof ApiChatRoute
-  WelcomeDashboardRoute: typeof WelcomeDashboardRoute
-  WelcomeIndexRoute: typeof WelcomeIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/my-home': {
+      id: '/my-home'
+      path: '/my-home'
+      fullPath: '/my-home'
+      preLoaderRoute: typeof MyHomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/insights': {
       id: '/insights'
       path: '/insights'
@@ -131,20 +139,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/welcome/': {
-      id: '/welcome/'
-      path: '/welcome'
-      fullPath: '/welcome/'
-      preLoaderRoute: typeof WelcomeIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/welcome/dashboard': {
-      id: '/welcome/dashboard'
-      path: '/welcome/dashboard'
-      fullPath: '/welcome/dashboard'
-      preLoaderRoute: typeof WelcomeDashboardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/chat': {
       id: '/api/chat'
       path: '/api/chat'
@@ -159,9 +153,9 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ChatRoute: ChatRoute,
   InsightsRoute: InsightsRoute,
+  MyHomeRoute: MyHomeRoute,
+  SettingsRoute: SettingsRoute,
   ApiChatRoute: ApiChatRoute,
-  WelcomeDashboardRoute: WelcomeDashboardRoute,
-  WelcomeIndexRoute: WelcomeIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
