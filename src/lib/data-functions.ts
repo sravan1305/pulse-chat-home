@@ -75,3 +75,15 @@ export const getContractFn = createServerFn({ method: "POST" })
 export const getLast30Fn = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => householdInput.parse(input))
   .handler(async ({ data }) => buildLast30Days(data.householdId, origin()));
+
+export const getMyHomeFn = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => householdInput.parse(input))
+  .handler(async ({ data }) => {
+    const view = getHouseholdView(data.householdId);
+    const contract = getContractView(data.householdId);
+    const bills = getMonthlyBillsView(data.householdId);
+    const last30 = await buildLast30Days(data.householdId, origin());
+    const yearTotals = summarizeYear(bills, DEMO_TODAY.slice(0, 4));
+    return { ...view, contract, bills, last30, yearTotals };
+  });
+
