@@ -627,7 +627,7 @@ export function OnboardingChat() {
         setStep({ kind: "done" });
         break;
       case "done":
-        navigate({ to: "/welcome/dashboard" });
+        navigate({ to: "/welcome/dashboard", search: { hh: selectedHouseholdId } });
         break;
     }
   }
