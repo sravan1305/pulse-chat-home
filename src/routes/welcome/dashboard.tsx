@@ -1,9 +1,19 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { z } from "zod";
 
+import householdsRaw from "@/data/raw/households.json";
 import { APPLIANCE_LABEL, loadOnboarding, type OnboardingAnswers } from "@/lib/onboarding";
 
+type HouseholdLite = { household_id: string; name: string; city: string };
+const HOUSEHOLDS = householdsRaw as HouseholdLite[];
+
+const searchSchema = z.object({
+  hh: z.string().optional(),
+});
+
 export const Route = createFileRoute("/welcome/dashboard")({
+  validateSearch: searchSchema,
   head: () => ({
     meta: [
       { title: "Your Pulse setup" },
@@ -14,17 +24,21 @@ export const Route = createFileRoute("/welcome/dashboard")({
 });
 
 function WelcomeDashboardPage() {
+  const search = Route.useSearch();
   const [data, setData] = useState<OnboardingAnswers | null>(null);
 
   useEffect(() => {
     setData(loadOnboarding());
   }, []);
 
+  const hhId = search.hh ?? data?.household_id;
+  const household = hhId ? HOUSEHOLDS.find((h) => h.household_id === hhId) : undefined;
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-[color:var(--border)] bg-white">
         <div className="mx-auto flex max-w-[720px] items-center justify-between px-5 py-4">
-          <Link to="/" className="flex items-center gap-2">
+          <Link to="/" search={{ hh: hhId }} className="flex items-center gap-2">
             <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--brand-navy)] text-[12px] font-bold text-white">
               P
             </div>
@@ -32,6 +46,7 @@ function WelcomeDashboardPage() {
           </Link>
           <Link
             to="/welcome"
+            search={{ hh: hhId }}
             className="text-[14px] font-medium text-[var(--brand-stone)] underline-offset-4 hover:underline"
           >
             Redo setup
@@ -52,13 +67,14 @@ function WelcomeDashboardPage() {
           {!data ? (
             <p className="mt-3 text-[15px] text-[var(--brand-navy)]">
               No answers yet —{" "}
-              <Link to="/welcome" className="font-semibold underline">
+              <Link to="/welcome" search={{ hh: hhId }} className="font-semibold underline">
                 start setup
               </Link>
               .
             </p>
           ) : (
             <div className="mt-4 space-y-4 text-[15px] text-[var(--brand-navy)]">
+              {household && <Row label="Home" value={`${household.name} · ${household.city}`} />}
               <div>
                 <div className="font-semibold">Appliances</div>
                 {data.appliances.length === 0 ? (
