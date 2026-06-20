@@ -26,13 +26,10 @@ export function ChatBubble({ role, children, onEdit }: BubbleProps) {
             }
           : {})}
         className={cn(
-          "group relative inline-flex max-w-[88%] items-center gap-2 rounded-[14px] px-4 py-3 text-left text-[16px] leading-snug shadow-sm transition-all",
-          isAssistant
-            ? "bg-[var(--brand-navy)] text-white font-semibold"
-            : "bg-[var(--brand-yellow)] text-[var(--brand-navy)] font-medium",
+          "group relative inline-flex max-w-[88%] items-center gap-2 rounded-2xl px-4 py-3 text-left text-[15px] leading-snug shadow-sm transition-all",
+          isAssistant ? "bg-navy text-white font-medium" : "bg-cta text-navy font-semibold",
           editable && "cursor-pointer hover:brightness-95 active:scale-[0.98]",
         )}
-        style={{ borderRadius: 14 }}
       >
         <span>{children}</span>
         {editable && (
@@ -50,10 +47,7 @@ export function ChatBubble({ role, children, onEdit }: BubbleProps) {
 export function TypingBubble() {
   return (
     <div className="pulse-enter flex justify-start">
-      <div
-        className="flex gap-1 rounded-[14px] bg-[var(--brand-navy)] px-4 py-3"
-        style={{ borderRadius: 14 }}
-      >
+      <div className="flex gap-1 rounded-2xl bg-navy px-4 py-3">
         {[0, 0.15, 0.3].map((d, i) => (
           <span
             key={i}
@@ -80,13 +74,12 @@ export function Chip({ selected, onClick, children, disabled }: ChipProps) {
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "min-h-[48px] rounded-[14px] border-2 px-5 py-3 text-[16px] font-semibold transition-all",
+        "min-h-[44px] rounded-xl border-2 px-4 py-2.5 text-[15px] font-semibold transition-all",
         "active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40",
         selected
-          ? "border-[var(--brand-yellow)] bg-[var(--brand-yellow)] text-[var(--brand-navy)]"
-          : "border-[color:var(--border)] bg-white text-[var(--brand-navy)] hover:border-[var(--brand-navy)]",
+          ? "border-cta bg-cta text-navy"
+          : "border-border bg-white text-navy hover:border-navy",
       )}
-      style={{ borderRadius: 14 }}
     >
       {children}
     </button>
@@ -108,10 +101,9 @@ export function PrimaryButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "min-h-[52px] w-full rounded-[14px] bg-[var(--brand-yellow)] px-6 py-3 text-[16px] font-semibold text-[var(--brand-navy)] transition-all",
-        "active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40 shadow-sm hover:shadow",
+        "btn-cta w-full justify-center min-h-[52px]",
+        "active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40",
       )}
-      style={{ borderRadius: 14 }}
     >
       {children}
     </button>
@@ -123,7 +115,7 @@ export function SkipLink({ onClick, label = "Skip" }: { onClick: () => void; lab
     <button
       type="button"
       onClick={onClick}
-      className="text-[14px] font-medium text-[var(--brand-stone)] underline-offset-4 hover:underline"
+      className="text-[13px] font-semibold text-white/70 underline-offset-4 hover:text-white hover:underline"
     >
       {label}
     </button>
@@ -136,7 +128,7 @@ export function UndoLink({ onClick }: { onClick: () => void }) {
       <button
         type="button"
         onClick={onClick}
-        className="inline-flex items-center gap-1 text-[13px] font-medium text-[var(--brand-stone)] underline-offset-4 hover:underline"
+        className="inline-flex items-center gap-1 text-[13px] font-medium text-stone underline-offset-4 hover:underline"
       >
         <svg
           width="12"
@@ -166,7 +158,7 @@ export function ProgressDots({ total, current }: { total: number; current: numbe
           key={i}
           className={cn(
             "h-1.5 rounded-full transition-all",
-            i < current ? "w-6 bg-[var(--brand-navy)]" : "w-1.5 bg-[var(--border)]",
+            i < current ? "w-6 bg-cta" : "w-1.5 bg-white/25",
           )}
         />
       ))}
